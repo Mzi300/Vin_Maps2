@@ -1,4 +1,6 @@
-# Logs
+# =========================
+# LOGS
+# =========================
 logs
 *.log
 npm-debug.log*
@@ -7,18 +9,86 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# =========================
+# DEPENDENCIES
+# =========================
+node_modules/
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# =========================
+# BUILD OUTPUTS
+# =========================
+dist/
+dist-ssr/
+build/
+out/
+.next/
+.nuxt/
+
+# =========================
+# ENVIRONMENT FILES (CRITICAL)
+# =========================
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+.env.*.local
+
+# =========================
+# CACHE / TEMP FILES
+# =========================
+.cache/
+.tmp/
+temp/
+
+# =========================
+# VITE / FRONTEND TOOLING
+# =========================
+.vite/
+
+# =========================
+# OS FILES
+# =========================
 .DS_Store
+Thumbs.db
+
+# =========================
+# EDITOR / IDE
+# =========================
+.vscode/
+!.vscode/extensions.json
+.idea/
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# =========================
+# GIT / DEPLOYMENT
+# =========================
+.git/
+*.pem
+
+# =========================
+# TEST / COVERAGE
+# =========================
+coverage/
+
+# =========================
+# OPTIONAL (SAFETY FOR LARGE PROJECTS)
+# =========================
+*.zip
+*.tar
+*.rar
+
+# =========================
+# DATABASE FILES (if any local dev DB used)
+# =========================
+*.sqlite
+*.db
+
+# =========================
+# LOGIC SAFETY (CUSTOM FOR VINMAPS)
+# =========================
+.env.example
