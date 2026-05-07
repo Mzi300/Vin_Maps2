@@ -8,23 +8,36 @@ export class MapRenderer {
   public map!: mapboxgl.Map;
   public visualEffects!: VisualEffects;
   private animationId: number | null = null;
+  private isNavigationMode: boolean = false;
+  private targetZoom: number = 18;
+  private currentZoom: number = 18;
+  private isOrbiting: boolean = false;
+  private orbitAngle: number = 0;
+  private lastHeading: number = 0;
+  private currentHeading: number = 0;
+  private currentRoll: number = 0;
+  private currentCenter: [number, number] | null = null;
 
   constructor(containerId: string, token: string) {
     this.containerId = containerId;
     this.initMap(token);
   }
 
+  /** --------------------------------------------------------------
+   *  Initialise the Mapbox map
+   *  -------------------------------------------------------------- */
   private initMap(token: string) {
     mapboxgl.accessToken = token;
-    
-    // 1. Initialize with Mapbox Standard for Photo-Realistic 3D
+
+    // 1. Initialise with Mapbox Standard for photo‑realistic 3D
     this.map = new mapboxgl.Map({
       container: this.containerId,
       style: 'mapbox://styles/mapbox/standard',
       center: [28.0473, -26.2041],
-      zoom: 16.5,
-      pitch: 70,
+      zoom: 14.5, // Wider overview for launch
+      pitch: 60,
       bearing: -17.6,
+
       antialias: true,
       interactive: true,
       maxBounds: [
@@ -36,45 +49,46 @@ export class MapRenderer {
     this.map.on('style.load', () => {
       this.visualEffects = new VisualEffects(this.map);
 
-      // 2. Set Cinematic Lighting (Dusk Mode for texture depth)
+      // 2. Cinematic lighting (dusk)
       this.map.setConfigProperty('basemap', 'lightPreset', 'dusk');
       this.map.setConfigProperty('basemap', 'showLandmarks', true);
       this.map.setConfigProperty('basemap', 'show3dObjects', true);
 
-      // 3. Re-Inject High-Visibility Tactical Roads on top of Standard
+      // 3. Tactical road overlay
       this.injectTacticalRoads();
 
-      // 4. Atmosphere Tuning
+      // 4. Atmosphere (fog)
       this.map.setFog({
-        'range': [0.5, 4],
-        'color': '#050505',
+        range: [0.5, 4],
+        color: '#050505',
         'high-color': '#00f2ff',
         'space-color': '#000000',
         'horizon-blend': 0.05
       });
-      
-      // 5. Stylize Labels to match reference (Floating/Glowing)
+
+      // 5. Stylised label appearance
       this.stylizeLabels();
     });
 
     this.map.on('load', () => {
       this.startRotation();
+
+      // Cancel rotation on user interaction
       this.map.on('mousedown', () => this.stopRotation());
       this.map.on('wheel', () => this.stopRotation());
       this.map.on('touchstart', () => this.stopRotation());
-      
+
       // 6. Interactive POIs
       this.map.on('click', 'poi-label', (e) => {
         if (!e.features || e.features.length === 0) return;
         const feature = e.features[0];
         const props = feature.properties as any;
-        const name = props.name || "Target Objective";
-        const category = props.category_en || "Urban Node";
-        
+        const name = props.name || 'Target Objective';
+        const category = props.category_en || 'Urban Node';
         this.emitPoiIntelligence(name, category, feature.geometry);
       });
 
-      // Change cursor on hover
+      // Cursor hover effects
       this.map.on('mouseenter', 'poi-label', () => {
         this.map.getCanvas().style.cursor = 'pointer';
       });
@@ -83,9 +97,13 @@ export class MapRenderer {
       });
     });
 
+    // Global intelligence updates
     intelligence.on('intelligence-update', (update: any) => this.addTacticalMarker(update));
   }
 
+  /** --------------------------------------------------------------
+   *  Helper to broadcast POI intelligence events
+   *  -------------------------------------------------------------- */
   private emitPoiIntelligence(name: string, category: string, geometry: any) {
     const event = new CustomEvent('poi-intelligence', {
       detail: { name, category, location: (geometry as any).coordinates }
@@ -93,6 +111,9 @@ export class MapRenderer {
     window.dispatchEvent(event);
   }
 
+  /** --------------------------------------------------------------
+   *  POI layer filter
+   *  -------------------------------------------------------------- */
   public setPoiFilter(category: string) {
     const layers = this.map.getStyle().layers;
     layers.forEach(layer => {
@@ -103,8 +124,6 @@ export class MapRenderer {
             this.map.setPaintProperty(layer.id, 'icon-opacity', 1);
             this.map.setPaintProperty(layer.id, 'text-opacity', 1);
           } else {
-            // Check if the layer supports filtering by category
-            // Standard POI categories: 'restaurant', 'hotel', 'museum', etc.
             this.map.setFilter(layer.id, ['==', ['get', 'category_en'], category]);
           }
         } catch (e) {}
@@ -112,11 +131,11 @@ export class MapRenderer {
     });
   }
 
+  /** --------------------------------------------------------------
+   *  Tactical road styling
+   *  -------------------------------------------------------------- */
   private injectTacticalRoads() {
-    // We'll use a safer approach to style existing layers
     const layers = this.map.getStyle().layers;
-    
-    // Find layers that contain 'road', 'water', 'land' in their ID
     layers.forEach(layer => {
       try {
         if (layer.id.includes('road')) {
@@ -126,45 +145,53 @@ export class MapRenderer {
           this.map.setPaintProperty(layer.id, 'fill-color', '#0000ff');
         }
         if (layer.id.includes('land') || layer.id.includes('park') || layer.id.includes('green')) {
-          this.map.setPaintProperty(layer.id, 'fill-color', layer.id.includes('land') ? '#4b3621' : '#00ff00');
+          this.map.setPaintProperty(
+            layer.id,
+            'fill-color',
+            layer.id.includes('land') ? '#4b3621' : '#00ff00'
+          );
         }
-      } catch (e) {
-        // Some layers might not support these properties or are part of components
-      }
+      } catch (e) {}
     });
 
     this.addSafetyIntelligenceLayer();
   }
 
+  /** --------------------------------------------------------------
+   *  Safety heat‑map layer
+   *  -------------------------------------------------------------- */
   private addSafetyIntelligenceLayer() {
-    // Add a glowing "Safe Corridor" or "Heatmap"
-    // Starts empty, will be populated along the route dynamically if needed
     this.map.addSource('safety-intel', {
-      'type': 'geojson',
-      'data': {
-        'type': 'FeatureCollection',
-        'features': []
-      }
+      type: 'geojson',
+      data: { type: 'FeatureCollection', features: [] }
     });
 
     this.map.addLayer({
-      'id': 'safety-heatmap',
-      'type': 'heatmap',
-      'source': 'safety-intel',
-      'paint': {
+      id: 'safety-heatmap',
+      type: 'heatmap',
+      source: 'safety-intel',
+      paint: {
         'heatmap-weight': ['get', 'intensity'],
         'heatmap-intensity': 1,
         'heatmap-color': [
-          'interpolate', ['linear'], ['heatmap-density'],
-          0, 'rgba(0, 242, 255, 0)',
-          0.5, 'rgba(0, 242, 255, 0.2)',
-          1, 'rgba(0, 242, 255, 0.5)'
+          'interpolate',
+          ['linear'],
+          ['heatmap-density'],
+          0,
+          'rgba(0, 242, 255, 0)',
+          0.5,
+          'rgba(0, 242, 255, 0.2)',
+          1,
+          'rgba(0, 242, 255, 0.5)'
         ],
         'heatmap-radius': 50
       }
     });
   }
 
+  /** --------------------------------------------------------------
+   *  Label appearance
+   *  -------------------------------------------------------------- */
   private stylizeLabels() {
     const layers = this.map.getStyle().layers;
     layers.forEach(layer => {
@@ -178,41 +205,65 @@ export class MapRenderer {
     });
   }
 
+  /** --------------------------------------------------------------
+   *  Rotation (demo) helpers
+   *  -------------------------------------------------------------- */
   private startRotation() {
-    if (!this.animationId) this.animationId = requestAnimationFrame((t) => this.rotateCamera(t));
+    if (!this.animationId) this.animationId = requestAnimationFrame(t => this.rotateCamera(t));
   }
 
   private stopRotation() {
-    if (this.animationId) { cancelAnimationFrame(this.animationId); this.animationId = null; }
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
   }
 
   private rotateCamera(timestamp: number) {
     this.map.rotateTo((timestamp / 500) % 360, { duration: 0 });
-    this.animationId = requestAnimationFrame((t) => this.rotateCamera(t));
+    this.animationId = requestAnimationFrame(t => this.rotateCamera(t));
   }
 
+  /** --------------------------------------------------------------
+   *  Tactical marker UI
+   *  -------------------------------------------------------------- */
   private addTacticalMarker(update: any) {
     const el = document.createElement('div');
-    el.style.cssText = `width:16px; height:16px; background:${update.severity === 'critical' ? '#ff0000' : '#00f2ff'}; border-radius:50%; box-shadow:0 0 15px rgba(255,255,255,0.5); border: 2px solid white;`;
+    el.style.cssText = `width:16px; height:16px; background:${
+      update.severity === 'critical' ? '#ff0000' : '#00f2ff'
+    }; border-radius:50%; box-shadow:0 0 15px rgba(255,255,255,0.5); border: 2px solid white;`;
     new mapboxgl.Marker(el).setLngLat(update.location).addTo(this.map);
   }
 
-  public flyTo(lng: number, lat: number) {
+  /** --------------------------------------------------------------
+   *  Camera flight helpers
+   *  -------------------------------------------------------------- */
+  public flyTo(lng: number, lat: number, zoom: number = 18.5) {
     this.stopRotation();
-    this.map.flyTo({ center: [lng, lat], zoom: 17, pitch: 75, speed: 0.6, curve: 1.2, essential: true });
-    this.map.once('moveend', () => this.startRotation());
+    this.isOrbiting = false;
+    this.map.flyTo({
+      center: [lng, lat],
+      zoom: zoom,
+      pitch: 75, // Windshield angle
+      speed: 1.2, // Faster for immediate feel
+      curve: 1.0,
+      essential: true
+    });
   }
 
-  public executeCameraSequence(origin: [number, number], destination: [number, number], routeCoords?: [number, number][]) {
+  /** --------------------------------------------------------------
+   *  Execute full navigation camera sequence
+   *  -------------------------------------------------------------- */
+  public executeCameraSequence(
+    origin: [number, number],
+    destination: [number, number],
+    routeCoords?: [number, number][]
+  ) {
     this.stopRotation();
 
-    // Trigger Visual Effects Route Drawing
     if (this.visualEffects) {
       this.visualEffects.drawGlowingRoute(origin, destination, routeCoords);
     }
-
-    // STEP 1 & 2: ROUTE INITIALIZATION & VISUALIZATION
-    // Automatically zoom out to fit entire route in viewport (bounding box)
     const bounds = new mapboxgl.LngLatBounds();
     if (routeCoords && routeCoords.length > 0) {
       routeCoords.forEach(coord => bounds.extend(coord));
@@ -220,36 +271,181 @@ export class MapRenderer {
       bounds.extend(origin).extend(destination);
     }
 
-    this.map.fitBounds(bounds, { padding: 100, pitch: 30, bearing: 0, duration: 1500 });
-    
-    this.map.once('moveend', () => {
-      // Calculate initial bearing if route coordinates are available
-      let initialBearing = 45;
-      if (routeCoords && routeCoords.length >= 2) {
-        const start = routeCoords[0];
-        const next = routeCoords[1];
-        const dx = next[0] - start[0];
-        const dy = next[1] - start[1];
-        initialBearing = (Math.atan2(dx, dy) * 180) / Math.PI;
-      }
+    // 1. Calculate Initial Bearing to face the road immediately
+    let initialBearing = 0;
+    if (routeCoords && routeCoords.length >= 2) {
+      const start = routeCoords[0];
+      const next = routeCoords[1];
+      // Mapbox bearing: atan2(dx, dy)
+      initialBearing = (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI;
+    }
 
-      setTimeout(() => {
-        this.map.flyTo({
-          center: origin,
-          zoom: 18.5,
-          pitch: 75,
-          bearing: initialBearing,
-          speed: 0.8,
-          curve: 1.4,
-          essential: true
-        });
-      }, 300);
+    this.isOrbiting = false;
+    this.stopRotation();
+    
+    // 2. Immediate Focus: Fly to origin facing the correct direction
+    this.map.flyTo({
+      center: origin,
+      zoom: 19,
+      pitch: 75,
+      bearing: initialBearing,
+      duration: 800, // Faster transition
+      essential: true
+    });
+
+    this.map.once('moveend', () => {
+      this.resetCameraState(origin, initialBearing);
+      this.enterNavigationMode();
+      
+      this.map.easeTo({
+        center: origin,
+        zoom: 19,
+        pitch: 75,
+        bearing: initialBearing,
+        duration: 200 // Final snap
+      });
+
+      this.map.once('moveend', () => {
+        if (this.visualEffects) this.visualEffects.startNavigationAnimation();
+      });
     });
   }
 
+  public resetCameraState(coords: [number, number], heading: number) {
+    this.currentCenter = coords;
+    this.currentHeading = heading;
+    this.lastHeading = heading;
+    this.currentZoom = 19;
+    this.currentRoll = 0;
+  }
 
-
+  /** --------------------------------------------------------------
+   *  Tactical mode helper
+   *  -------------------------------------------------------------- */
   public forceTacticalMode() {
     this.map.easeTo({ pitch: 80, bearing: 0, zoom: 17, duration: 2000 });
+  }
+
+  /** --------------------------------------------------------------
+   *  Navigation mode toggles
+   *  -------------------------------------------------------------- */
+  public enterNavigationMode() {
+    this.isNavigationMode = true;
+    this.stopRotation();
+    this.map.easeTo({
+      pitch: 60,
+      zoom: 18,
+      duration: 1000,
+      padding: { bottom: 200 }
+    });
+  }
+
+  public exitNavigationMode() {
+    this.isNavigationMode = false;
+    this.map.easeTo({
+      pitch: 0,
+      padding: { bottom: 0 },
+      duration: 1000
+    });
+  }
+
+  /** --------------------------------------------------------------
+   *  updateCameraForNav – called each navigation frame
+   *  -------------------------------------------------------------- */
+  public updateCameraForNav(
+    coords: [number, number],
+    heading: number,
+    speed: number,
+    minZoom: number = 15.5,
+    maxZoom: number = 19
+
+  ) {
+    if (!this.isNavigationMode) return;
+
+    // ---- 0. Heading‑lock stabilization (freeze when vehicle is near‑stationary) ----
+    const minHeadingSpeed = 0.5; // m/s
+    if (speed < minHeadingSpeed) {
+      heading = this.lastHeading;
+    } else {
+      this.lastHeading = heading;
+    }
+
+    // ---- 1. Cinematic Heading Alignment (Interpolation) ----
+    // Calculate shortest path between current and target heading to avoid 360-flip
+    let targetHeading = heading;
+    let diff = targetHeading - this.currentHeading;
+    while (diff < -180) diff += 360;
+    while (diff > 180) diff -= 360;
+    
+    // Speed-based interpolation factor: slower/weightier at high speed
+    const lerpFactor = Math.min(0.08, 0.01 + (speed * 0.005)); 
+    this.currentHeading += diff * lerpFactor;
+
+
+    // ---- 2. Turn-based Cinematic Tilt (Roll simulation) ----
+    // Simulate a more dynamic camera tilt when turning at speed (GTA style)
+    const turnIntensity = diff * (speed / 8); // Slightly higher intensity
+    const targetRoll = Math.max(-15, Math.min(15, turnIntensity)); // Cap at +/- 15 degrees
+    this.currentRoll += (targetRoll - this.currentRoll) * 0.08;
+
+
+    // ---- 3. Dynamic zoom & pitch based on speed (GTA style pull-back) ----
+    // Lower pitch and pull back as speed increases
+    this.targetZoom = Math.max(minZoom, maxZoom - speed * 0.2);
+    const targetPitch = Math.max(50, 75 - speed * 1.5); 
+
+
+    // ---- 4. Predictive look‑ahead (forward offset with turn bias) ----
+    const lookAheadFactor = 2.5; // More aggressive look-ahead
+    const turnBias = diff * 0.2; // Shift camera slightly towards the turn
+    const offsetMeters = speed * lookAheadFactor;
+    const bearingRad = (this.currentHeading + turnBias) * Math.PI / 180;
+
+
+    const lat = coords[1];
+    const lng = coords[0];
+    const offsetLat = (offsetMeters * Math.sin(bearingRad)) / 110540;
+    const offsetLng = (offsetMeters * Math.cos(bearingRad)) / (111320 * Math.cos(lat * Math.PI / 180));
+
+    const lookAheadCenter: [number, number] = [lng + offsetLng, lat + offsetLat];
+
+    // ---- 5. Smooth interpolation for zoom, pitch, and center ----
+    this.currentZoom += (this.targetZoom - this.currentZoom) * 0.05;
+    const currentPitch = this.map.getPitch() + (targetPitch - this.map.getPitch()) * 0.05;
+    
+    if (!this.currentCenter) {
+      this.currentCenter = lookAheadCenter;
+    } else {
+      // Lerp center with speed-based damping (GTA feel)
+      const centerLerp = Math.min(0.15, 0.05 + (speed * 0.01));
+      this.currentCenter[0] += (lookAheadCenter[0] - this.currentCenter[0]) * centerLerp;
+      this.currentCenter[1] += (lookAheadCenter[1] - this.currentCenter[1]) * centerLerp;
+    }
+
+
+    // ---- 6. Apply the camera update ----
+    this.map.easeTo({
+      center: this.currentCenter,
+      bearing: this.currentHeading + this.currentRoll, // Add roll for turning tilt
+      zoom: this.currentZoom,
+      pitch: currentPitch,
+      duration: 0, 
+      easing: (t) => t
+    });
+
+    // Update Visual Effects Guidance system if destination is set
+    if (this.visualEffects && this.visualEffects.getDestination()) {
+      this.visualEffects.updateGuidanceSystem(coords, this.visualEffects.getDestination()!, speed);
+    }
+  }
+
+  private startOrbitAnimation() {
+    const orbit = () => {
+      if (!this.isOrbiting) return;
+      this.orbitAngle += 0.05;
+      this.map.setBearing(this.orbitAngle % 360);
+      requestAnimationFrame(orbit);
+    };
+    orbit();
   }
 }

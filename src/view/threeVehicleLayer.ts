@@ -5,6 +5,7 @@ export class ThreeVehicleLayer {
   public id = '3d-vehicle-layer';
   public type = 'custom' as const;
   public renderingMode = '3d' as const;
+  public slot = 'top';
 
   private map: mapboxgl.Map;
   private scene!: THREE.Scene;
@@ -30,64 +31,71 @@ export class ThreeVehicleLayer {
     });
     this.renderer.autoClear = false;
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); // Boosted
     this.scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 2.0); // Boosted
     directionalLight.position.set(0, 100, 50).normalize();
     this.scene.add(directionalLight);
 
-    this.vehicleMesh = this.createCyberVehicle();
+    this.vehicleMesh = this.createNavigationArrow();
     this.scene.add(this.vehicleMesh);
   }
 
-  private createCyberVehicle(): THREE.Group {
+  private createNavigationArrow(): THREE.Group {
     const group = new THREE.Group();
 
-    // Body
-    const bodyGeo = new THREE.BoxGeometry(2, 0.8, 4.5);
-    const bodyMat = new THREE.MeshStandardMaterial({ 
-      color: 0x1a1a1a, 
-      roughness: 0.3, 
-      metalness: 0.7 
+    // Create a custom geometry for the "folded" arrow look
+    const geometry = new THREE.BufferGeometry();
+    
+    // Vertices for a 3D folded arrow (Paper plane style)
+    // Tip is at (0, 0, 1), center fold is raised
+    const vertices = new Float32Array([
+      // Left Wing
+      0, 0.6, 2,    // 0: Tip (Top)
+      -1.2, 0, -1.5, // 1: Left Back
+      0, 0.2, -0.8,  // 2: Bottom Indent (Top)
+      
+      // Right Wing
+      0, 0.6, 2,    // 3: Tip (Top)
+      0, 0.2, -0.8,  // 4: Bottom Indent (Top)
+      1.2, 0, -1.5,  // 5: Right Back
+
+      // Underside (to give it volume)
+      -1.2, 0, -1.5,
+      1.2, 0, -1.5,
+      0, 0.2, -0.8
+    ]);
+
+    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    geometry.computeVertexNormals();
+
+    const material = new THREE.MeshStandardMaterial({ 
+      color: 0xff0000, 
+      metalness: 0.8,
+      roughness: 0.2,
+      emissive: 0xaa0000,
+      emissiveIntensity: 0.3,
+      depthTest: true, // Re-enable for correct ground placement
+      transparent: true,
+      side: THREE.DoubleSide
     });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.6;
-    group.add(body);
 
-    // Neon Glow Strip
-    const stripGeo = new THREE.BoxGeometry(2.1, 0.1, 4.6);
-    const stripMat = new THREE.MeshBasicMaterial({ color: 0x00f2ff });
-    const strip = new THREE.Mesh(stripGeo, stripMat);
-    strip.position.y = 0.4;
-    group.add(strip);
+    const arrow = new THREE.Mesh(geometry, material);
+    group.add(arrow);
 
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
-    wheelGeo.rotateZ(Math.PI / 2);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.9 });
+    // Scale up for visibility
+    group.scale.set(4, 4, 4);
     
-    const wheelPositions = [
-      [-1.1, 0.4, 1.5], [1.1, 0.4, 1.5],
-      [-1.1, 0.4, -1.5], [1.1, 0.4, -1.5]
-    ];
-    
-    wheelPositions.forEach(pos => {
-      const w = new THREE.Mesh(wheelGeo, wheelMat);
-      w.position.set(pos[0], pos[1], pos[2]);
-      group.add(w);
-    });
-
-    // Scale up slightly for visibility on map
-    group.scale.set(3, 3, 3);
-    
-    // Rotate so it points "forward" in the correct direction (Mapbox uses Y pointing North, X East)
-    // By default, Three.js Box is aligned with axes. We might need to adjust rotation in render.
     return group;
   }
 
   public updatePosition(coord: [number, number], bearing: number) {
     this.currentCoord = coord;
     this.currentBearing = bearing;
+    // Keep vehicle mesh upright (Y-up) and rotate to heading direction
+    const bearingRad = THREE.MathUtils.degToRad(this.currentBearing);
+    // Mapbox bearing is clockwise, Three.js is counter-clockwise
+    this.vehicleMesh.rotation.set(Math.PI / 2, 0, -bearingRad);
     this.map.triggerRepaint();
   }
 
@@ -100,16 +108,25 @@ export class ThreeVehicleLayer {
       0 // Altitude
     );
 
-    // Create transformation matrix
+    // Create transformation matrix for vehicle rendering
     const scale = mercatorCoord.meterInMercatorCoordinateUnits();
+    const bearingRad = THREE.MathUtils.degToRad(this.currentBearing);
+    
+    // Rotation around Z axis (up) to align vehicle forward direction with heading
+    // Rotation around Z axis (up) to align vehicle forward direction with heading
+    const rotationZ = new THREE.Matrix4().makeRotationZ(-bearingRad);
+    
+    // Translation to map position
+    const translation = new THREE.Matrix4().makeTranslation(mercatorCoord.x, mercatorCoord.y, mercatorCoord.z);
+    
+    // Uniform scaling (no Y inversion) to keep vehicle upright
+    const scaleM = new THREE.Matrix4().makeScale(scale, scale, scale);
+    
+    // Combine: translate -> rotate -> scale
+    const modelMatrix = translation.multiply(rotationZ).multiply(scaleM);
     
     const m = new THREE.Matrix4().fromArray(matrix);
-    const l = new THREE.Matrix4().makeTranslation(mercatorCoord.x, mercatorCoord.y, mercatorCoord.z)
-      .scale(new THREE.Vector3(scale, -scale, scale)) // Invert Y axis for Mapbox
-      // Apply bearing rotation (convert degrees to radians, rotate around Z axis which is UP in Mapbox coordinates before the camera matrix)
-      .multiply(new THREE.Matrix4().makeRotationZ(-this.currentBearing * (Math.PI / 180)));
-
-    this.camera.projectionMatrix = m.multiply(l);
+    this.camera.projectionMatrix = m.multiply(modelMatrix);
     
     // Reset state for Mapbox
     this.renderer.state.reset();

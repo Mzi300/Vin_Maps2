@@ -47,6 +47,18 @@ class IntelligenceManager extends EventEmitter {
 
     this.emit('intelligence-update', update);
   }
+
+  public report(data: any) {
+    const update: IntelligenceUpdate = {
+      id: Math.random().toString(36).substr(2, 9),
+      type: data.payload.type as IntelligenceType,
+      severity: 'medium',
+      location: data.payload.location,
+      message: `User Reported: ${data.payload.type}`,
+      timestamp: data.timestamp
+    };
+    this.emit('intelligence-update', update);
+  }
 }
 
 export const intelligence = new IntelligenceManager();

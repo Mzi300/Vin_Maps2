@@ -2,6 +2,7 @@ export interface OptimizedRoute {
   distance: number;
   duration: number;
   coordinates: [number, number][];
+  steps: any[];
   safetyScore: number;
   latency?: number;
 }
@@ -52,7 +53,7 @@ export class RouteOptimizer {
         if (signal?.aborted) return null;
         
         try {
-          const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?geometries=geojson&overview=full&access_token=${this.token}`;
+          const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${origin[0]},${origin[1]};${destination[0]},${destination[1]}?geometries=geojson&overview=full&steps=true&access_token=${this.token}`;
           const response = await fetch(url, { signal });
           
           if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
@@ -70,6 +71,7 @@ export class RouteOptimizer {
             distance: route.distance,
             duration: route.duration,
             coordinates: simplifiedCoords,
+            steps: route.legs[0]?.steps || [],
             safetyScore: Math.floor(Math.random() * 15 + 85),
             latency: performance.now() - startTime
           };

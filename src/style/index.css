@@ -54,6 +54,22 @@ body {
   cursor: grabbing;
 }
 
+.bottom-controls {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  right: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  pointer-events: none;
+  z-index: 50;
+}
+
+.bottom-controls > * {
+  pointer-events: auto;
+}
+
 .ui-overlay {
   position: absolute;
   top: 0;
@@ -576,54 +592,415 @@ body {
   display: none;
 }
 
-/* DESTINATION MARKER */
-.dest-marker {
-  width: 20px;
-  height: 20px;
+/* DESTINATION MARKER (ENHANCED) */
+.dest-marker-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+  filter: drop-shadow(0 0 15px rgba(0, 242, 255, 0.6));
 }
 
-.pin {
-  width: 20px;
-  height: 20px;
+.dest-pin-glow {
+  position: absolute;
+  width: 60px;
+  height: 60px;
+  background: radial-gradient(circle, rgba(0, 242, 255, 0.4) 0%, transparent 70%);
+  bottom: -20px;
+  z-index: -1;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.dest-pin-ring {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border: 2px solid var(--primary-accent);
+  border-radius: 50%;
+  bottom: -10px;
+  opacity: 0.8;
+  animation: ripple 3s linear infinite;
+}
+
+.dest-pin-ring.ring-2 {
+  animation-delay: 1s;
+}
+
+.dest-pin {
+  width: 24px;
+  height: 36px;
   background: var(--danger);
   border-radius: 50% 50% 50% 0;
   transform: rotate(-45deg);
-  position: absolute;
-  top: -10px;
-  left: -10px;
-  box-shadow: 0 0 10px rgba(255, 77, 77, 0.6);
+  position: relative;
+  border: 2px solid white;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  margin-bottom: 5px;
 }
 
-.pin::after {
-  content: '';
-  width: 8px;
-  height: 8px;
+.dest-pin-head {
+  width: 10px;
+  height: 10px;
   background: white;
   position: absolute;
   border-radius: 50%;
-  top: 6px;
-  left: 6px;
+  top: 5px;
+  left: 5px;
 }
 
-.pulse {
-  background: rgba(255, 77, 77, 0.4);
-  border-radius: 50%;
-  height: 40px;
+.dest-label {
+  background: rgba(0, 242, 255, 0.2);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--primary-accent);
+  color: white;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  text-shadow: 0 0 5px rgba(0, 242, 255, 0.8);
+  letter-spacing: 1px;
+}
+
+@keyframes pulse-glow {
+  0%, 100% { transform: scale(1); opacity: 0.4; }
+  50% { transform: scale(1.5); opacity: 0.8; }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(3); opacity: 0; }
+}
+
+/* USER LOCATION GLOW */
+.user-location-glow {
   width: 40px;
-  position: absolute;
-  left: -20px;
-  top: -20px;
-  animation: markerPulse 1.5s infinite;
-  z-index: -1;
+  height: 40px;
+  background: radial-gradient(circle, rgba(0, 242, 255, 0.6) 0%, transparent 70%);
+  border-radius: 50%;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+  animation: user-pulse 2s ease-in-out infinite;
+  pointer-events: none;
 }
 
-@keyframes markerPulse {
-  0% { transform: scale(0.5); opacity: 0; }
-  50% { opacity: 0.5; }
-  100% { transform: scale(1.5); opacity: 0; }
+@keyframes user-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.6; }
+  50% { transform: scale(1.2); opacity: 1; }
 }
+
 
 .info-readout {
   /* Ensure it has a transition */
   transition: all 0.3s ease;
 }
+
+/* TACTICAL DROPDOWN */
+.dropdown-container {
+  position: relative;
+  display: flex;
+  width: fit-content;
+  pointer-events: auto;
+  padding: 5px;
+}
+
+.dropdown-menu {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  width: 280px;
+  max-height: 450px; /* Slightly taller */
+  overflow-y: auto;
+  margin-bottom: 15px;
+  display: none;
+  flex-direction: column;
+  padding: 1rem;
+  z-index: 2000; /* Higher than everything */
+  animation: slideInUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.dropdown-menu.active {
+  display: flex;
+}
+
+.dropdown-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 5px 0;
+}
+
+.dropdown-section label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+  padding-left: 5px;
+  font-weight: bold;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 10px 0;
+}
+
+.dropdown-toggle {
+  padding: 0.8rem 1.5rem !important;
+  font-size: 0.9rem !important;
+}
+
+.dropdown-toggle .arrow {
+  font-size: 0.7rem;
+  margin-left: 5px;
+  transition: transform 0.3s;
+}
+
+.dropdown-menu::-webkit-scrollbar {
+  width: 4px;
+}
+
+.dropdown-menu::-webkit-scrollbar-thumb {
+  background: var(--primary-accent);
+  border-radius: 10px;
+}
+
+.recenter-btn {
+  position: absolute;
+  bottom: 6rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0.6rem 1.2rem;
+  border-radius: 30px;
+  color: var(--primary-accent);
+  font-weight: bold;
+  font-size: 0.8rem;
+  cursor: pointer;
+  z-index: 60;
+  border: 1px solid var(--primary-accent);
+  box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
+  transition: all 0.2s;
+  animation: slideInUp 0.3s ease-out;
+}
+
+.recenter-btn:hover {
+  background: rgba(0, 242, 255, 0.1);
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+}
+
+/* MANEUVER CARD */
+.maneuver-card {
+  position: absolute;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: auto;
+  min-width: 320px;
+  padding: 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  border-radius: 20px;
+  z-index: 50;
+  pointer-events: auto;
+  border: 1px solid var(--primary-accent);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+  animation: slideInDown 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.maneuver-icon {
+  font-size: 2.5rem;
+  color: var(--primary-accent);
+  text-shadow: 0 0 15px rgba(0, 242, 255, 0.5);
+  font-weight: bold;
+}
+
+.maneuver-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.instruction-main {
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.instruction-sub {
+  font-size: 0.9rem;
+  color: var(--primary-accent);
+  font-weight: bold;
+  opacity: 0.9;
+}
+
+/* HAZARD FAB */
+.hazard-fab {
+  position: absolute;
+  right: 1.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  z-index: 55;
+}
+
+.hazard-btn {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1px solid var(--glass-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(8px);
+  cursor: pointer;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  pointer-events: auto;
+}
+
+.hazard-btn:hover {
+  transform: scale(1.1);
+  border-color: var(--primary-accent);
+  box-shadow: 0 0 15px var(--primary-accent);
+}
+
+/* SUMMARY MODAL */
+.summary-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 320px;
+  padding: 2rem;
+  text-align: center;
+  z-index: 200;
+  pointer-events: auto;
+  border: 2px solid var(--primary-accent);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+  margin: 1.5rem 0;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.summary-item label {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  letter-spacing: 1px;
+}
+
+.summary-item span {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--primary-accent);
+}
+
+/* Startup Loader */
+.startup-loader {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at center, #0a0a0a 0%, #000 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+}
+
+.startup-loader.hidden {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.loader-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.loader-spinner {
+  width: 60px;
+  height: 60px;
+  border: 2px solid rgba(0, 242, 255, 0.1);
+  border-top-color: var(--primary-accent);
+  border-radius: 50%;
+  animation: spin 1s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  box-shadow: 0 0 20px rgba(0, 242, 255, 0.2);
+}
+
+.loader-title {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 800;
+  letter-spacing: 0.5rem;
+  color: var(--primary-accent);
+  margin: 0;
+  text-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.loader-status {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.6; }
+  50% { opacity: 1; }
+}
+
+/* DESTINATION BEACON (GTA/GAME STYLE) */
+.dest-beacon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  pointer-events: none;
+}
+
+.dest-beacon-beam {
+  width: 4px;
+  height: 1000px;
+  background: linear-gradient(to top, rgba(0, 242, 255, 0.8), transparent);
+  box-shadow: 0 0 30px rgba(0, 242, 255, 0.5);
+  transform-origin: bottom;
+  animation: beam-pulse 3s ease-in-out infinite;
+}
+
+.dest-beacon-flare {
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, rgba(0, 242, 255, 0.6) 0%, transparent 70%);
+  border-radius: 50%;
+  position: absolute;
+  bottom: -50px;
+  filter: blur(10px);
+}
+
+@keyframes beam-pulse {
+  0%, 100% { opacity: 0.4; transform: scaleX(1); }
+  50% { opacity: 1; transform: scaleX(1.5); }
+}
+
+

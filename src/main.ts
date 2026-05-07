@@ -6,6 +6,7 @@ import type { TransportType } from './data/transportModes';
 import { GeolocationService } from './engine/geolocationService';
 import { RouteOptimizer } from './engine/routeOptimizer';
 import type { OptimizedRoute } from './engine/routeOptimizer';
+import { NavigationSystem } from './engine/navigationSystem';
 import './style/index.css';
 
 window.addEventListener('error', (e) => {
@@ -35,7 +36,11 @@ class App {
   private currentOriginCoords: [number, number] | null = null;
   private currentDestCoords: [number, number] | null = null;
   private pendingRoutePromise: Promise<OptimizedRoute | null> | null = null;
-  
+  private navSystem!: NavigationSystem;
+  private currentTransportType: TransportType = 'car';
+  private tripStartTime: number = 0;
+  private tripTotalDistance: number = 0;
+  private tripIsActive: boolean = false;
   private geocodingAbortController: AbortController | null = null;
   private routingAbortController: AbortController | null = null;
 
@@ -77,6 +82,15 @@ class App {
       </div>
 
       <div class="ui-overlay">
+        <!-- Maneuver Instruction Card -->
+        <div id="maneuver-card" class="glass-panel maneuver-card" style="display: none;">
+          <div class="maneuver-icon" id="maneuver-icon">↑</div>
+          <div class="maneuver-text">
+            <span id="maneuver-instruction" class="instruction-main">Follow route</span>
+            <span id="maneuver-dist" class="instruction-sub">0 m</span>
+          </div>
+        </div>
+
         <button id="weather-toggle" class="weather-toggle-btn">Toggle Weather</button>
         <div class="top-controls">
           <div id="routing-engine" class="glass-panel command-bar search-state">
@@ -119,12 +133,35 @@ class App {
         </div>
 
         <div class="bottom-controls">
-          <div class="glass-panel category-bar">
-            <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
-            <button class="cat-btn" data-poi="police">🛡️ Security</button>
-            <button class="cat-btn" data-poi="bank">🏦 Financial</button>
-            <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
-            <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
+          <div class="glass-panel dropdown-container">
+            <button id="poi-dropdown-toggle" class="cat-btn dropdown-toggle">
+              🔍 Explore Intel <span class="arrow">▼</span>
+            </button>
+            <div id="poi-dropdown-menu" class="glass-panel dropdown-menu">
+              <div class="dropdown-section">
+                <label>VIMAPS INTEL</label>
+                <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
+                <button class="cat-btn" data-poi="police">🛡️ Security</button>
+                <button class="cat-btn" data-poi="bank">🏦 Financial</button>
+                <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
+                <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-section">
+                <label>MAPS EXPLORER</label>
+                <button class="cat-btn" data-poi="restaurant">🍴 Restaurants</button>
+                <button class="cat-btn" data-poi="hotel">🏨 Hotels</button>
+                <button class="cat-btn" data-poi="attraction">🎡 Things to do</button>
+                <button class="cat-btn" data-poi="museum">🏛️ Museums</button>
+                <button class="cat-btn" data-poi="transit">🚌 Transit</button>
+                <button class="cat-btn" data-poi="pharmacy">💊 Pharmacies</button>
+                <button class="cat-btn" data-poi="atm">🏧 ATMs</button>
+              </div>
+              <div class="dropdown-divider"></div>
+              <div class="dropdown-section">
+                <button class="sidebar-item" id="open-google-maps">🌐 Search Google Maps</button>
+              </div>
+            </div>
           </div>
           
           <div class="glass-panel info-readout" id="info-readout">
@@ -160,22 +197,69 @@ class App {
             </div>
             <button id="exit-nav" class="exit-nav-btn">EXIT</button>
           </div>
+
+          <!-- Re-center Button (Visible when camera is unlocked) -->
+          <button id="recenter-btn" class="glass-panel recenter-btn" style="display: none;">
+            <span class="icon">🎯</span> RE-CENTER
+          </button>
+
+          <!-- Hazard Reporting FAB -->
+          <div id="hazard-fab" class="hazard-fab" style="display: none;">
+            <button class="hazard-btn pothole" onclick="app.reportHazard('pothole')">🕳️</button>
+            <button class="hazard-btn accident" onclick="app.reportHazard('accident')">💥</button>
+            <button class="hazard-btn roadblock" onclick="app.reportHazard('roadblock')">🚧</button>
+          </div>
+
+          <!-- Trip Summary Modal -->
+          <div id="summary-modal" class="glass-panel summary-modal" style="display: none;">
+            <h2 class="tactical-title">MISSION DEBRIEF</h2>
+            <div class="summary-grid">
+              <div class="summary-item"><label>DISTANCE</label><span id="sum-dist">--</span></div>
+              <div class="summary-item"><label>TIME</label><span id="sum-time">--</span></div>
+              <div class="summary-item"><label>AVG SPEED</label><span id="sum-avg-speed">--</span></div>
+            </div>
+            <button class="tactical-btn" onclick="app.closeSummary()">CLOSE</button>
+          </div>
         </div>
 
         <div id="intel-feed" class="intel-feed"></div>
+
+        <!-- Startup Loading Overlay -->
+        <div id="startup-loader" class="startup-loader">
+          <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <h1 class="loader-title">VIMAPS SYSTEM</h1>
+            <p class="loader-status" id="loader-status">Initializing tactical link...</p>
+          </div>
+        </div>
       </div>
     `;
 
     this.map = new MapRenderer('map-container', this.token!);
+    (window as any).app = this;
     (window as any).appMap = this.map;
     
     this.routeOptimizer = new RouteOptimizer(this.token!);
+    this.navSystem = new NavigationSystem();
     this.routeOptimizer.prewarmRouting();
     
     this.map.map.on('load', () => {
       const geoService = new GeolocationService(this.map.map);
+      const loader = document.getElementById('startup-loader');
+      const loaderStatus = document.getElementById('loader-status');
+      
+      if (loaderStatus) loaderStatus.innerText = 'Acquiring high-precision lock...';
+
       geoService.initializeLocation((coords) => {
         this.currentOriginCoords = coords;
+        this.map.flyTo(coords[0], coords[1], 15.5); // Moderate zoom for initial lock
+        if (this.map.visualEffects) {
+          (this.map.visualEffects as any).updateUserLocationGlow(coords);
+        }
+        if (loader) {
+          loader.classList.add('hidden');
+          setTimeout(() => loader.remove(), 800);
+        }
       });
     });
 
@@ -216,7 +300,7 @@ class App {
         document.getElementById('route-active')!.style.display = 'none'; // HIDE SUMMARY AS REQUESTED
         document.getElementById('info-readout')!.style.display = 'none'; // HIDE CARD
         document.getElementById('advanced-toggle-area')!.style.display = 'none';
-        document.querySelector('.category-bar')!.classList.add('hidden');
+        document.querySelector('.dropdown-container')!.classList.add('hidden');
         document.getElementById('nav-bottom-bar')!.style.display = 'flex';
         break;
       case RoutingState.ERROR:
@@ -265,17 +349,60 @@ class App {
       document.getElementById('toggle-advanced')!.innerText = isHidden ? 'Advanced Tactical Data ▲' : 'Advanced Tactical Data ▼';
     });
 
-    document.getElementById('exit-nav')?.addEventListener('click', () => this.resetToSearch());
+    document.getElementById('exit-nav')?.addEventListener('click', () => {
+      this.resetToSearch();
+      document.querySelector('.dropdown-container')!.classList.remove('hidden');
+    });
+
+    document.getElementById('recenter-btn')?.addEventListener('click', () => {
+      if (this.map.visualEffects) this.map.visualEffects.recenter();
+    });
+
+    window.addEventListener('nav-camera-unlocked', () => {
+      const btn = document.getElementById('recenter-btn');
+      if (btn) btn.style.display = 'flex';
+    });
+
+    window.addEventListener('nav-camera-locked', () => {
+      const btn = document.getElementById('recenter-btn');
+      if (btn) btn.style.display = 'none';
+    });
 
     document.getElementById('weather-toggle')?.addEventListener('click', () => {
       if (this.map.visualEffects) this.map.visualEffects.toggleWeather();
     });
 
+    // Dropdown Logic
+    const dropdownToggle = document.getElementById('poi-dropdown-toggle');
+    const dropdownMenu = document.getElementById('poi-dropdown-menu');
+
+    dropdownToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu?.classList.toggle('active');
+      const arrow = dropdownToggle.querySelector('.arrow') as HTMLElement;
+      if (arrow) arrow.style.transform = dropdownMenu?.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    });
+
+    document.addEventListener('click', () => {
+      dropdownMenu?.classList.remove('active');
+      const arrow = dropdownToggle?.querySelector('.arrow') as HTMLElement;
+      if (arrow) arrow.style.transform = 'rotate(0deg)';
+    });
+
     document.querySelectorAll('.cat-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const poi = (e.currentTarget as HTMLButtonElement).dataset.poi!;
-        this.filterUrbanIntelligence(poi);
+        const poi = (e.currentTarget as HTMLButtonElement).dataset.poi;
+        if (poi) {
+          this.filterUrbanIntelligence(poi);
+          dropdownMenu?.classList.remove('active');
+        }
       });
+    });
+
+    document.getElementById('open-google-maps')?.addEventListener('click', () => {
+      const query = (document.getElementById('dest-input') as HTMLInputElement).value;
+      const url = query ? `https://www.google.com/maps/search/${encodeURIComponent(query)}` : `https://www.google.com/maps`;
+      window.open(url, '_blank');
     });
 
     document.querySelectorAll('.transport-tab').forEach(btn => {
@@ -372,8 +499,17 @@ class App {
         if (targetId === 'dest-input') this.currentDestCoords = coords;
         else this.currentOriginCoords = coords;
 
+        if (this.map.visualEffects) {
+          (this.map.visualEffects as any).updateUserLocationGlow(coords);
+        }
+
         reasoning.innerText = `AI Assistant: Position acquired: ${address}.`;
         this.map.flyTo(longitude, latitude);
+
+        // If we have both coords now, refresh the route line
+        if (this.currentOriginCoords && this.currentDestCoords) {
+          this.advanceToTransportStep();
+        }
       } catch (e) { console.error('Reverse geocode failed', e); }
     }, (err) => { reasoning.innerText = `AI Assistant: GPS acquisition failed: ${err.message}`; });
   }
@@ -399,7 +535,22 @@ class App {
         this.currentDestCoords, 
         'driving',
         this.routingAbortController.signal
-      );
+      ).then(async route => {
+        if (route) {
+          // Wait for map to be ready and visualEffects to be initialized
+          let attempts = 0;
+          while (!this.map.visualEffects && attempts < 20) {
+            await new Promise(r => setTimeout(r, 100));
+            attempts++;
+          }
+          
+          if (this.map.visualEffects) {
+            this.map.visualEffects.drawGlowingRoute(this.currentOriginCoords!, this.currentDestCoords!, route.coordinates);
+            this.map.flyTo(this.currentOriginCoords![0], this.currentOriginCoords![1]);
+          }
+        }
+        return route;
+      });
     }
   }
 
@@ -413,21 +564,33 @@ class App {
     document.getElementById('info-readout')!.style.display = 'block';
     document.querySelector('.category-bar')!.classList.remove('hidden');
     
+    document.getElementById('maneuver-card')!.style.display = 'none';
+    document.getElementById('hazard-fab')!.style.display = 'none';
+
+    if (this.tripIsActive) this.showTripSummary();
+    this.tripIsActive = false;
+
     this.updateUIState(RoutingState.IDLE);
   }
 
   private async finalizeRouting(type: TransportType) {
+    this.currentTransportType = type;
+    if (this.map.visualEffects) {
+      this.map.visualEffects.setTransportMode(TRANSPORT_PROFILES[type].icon);
+    }
     const dest = (document.getElementById('final-dest-display') as HTMLInputElement).value;
     
-    if (!this.currentOriginCoords || !this.currentDestCoords) {
-      this.updateUIState(RoutingState.ERROR);
-      return;
-    }
+    // 1. Critical GPS Auto-Lock: Fetch fresh accurate position before calculating route
+    const statusText = document.getElementById('loader-status');
+    if (statusText) statusText.innerText = 'Synchronizing GPS lock...';
+    
+    const geoService = new GeolocationService(this.map.map);
+    const freshPos = await new Promise<[number, number]>((resolve) => {
+      geoService.initializeLocation((coords) => resolve(coords));
+    });
 
-    // Only show Calculating UI if we don't have a pending/cached route ready
-    if (!this.pendingRoutePromise) {
-      this.updateUIState(RoutingState.CALCULATING);
-    }
+    this.currentOriginCoords = freshPos;
+    this.updateUIState(RoutingState.CALCULATING);
 
     if (this.routingAbortController) this.routingAbortController.abort();
     this.routingAbortController = new AbortController();
@@ -466,18 +629,146 @@ class App {
     const etaFormatted = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 
     document.getElementById('nav-eta-time')!.innerText = etaFormatted;
-    document.getElementById('nav-distance')!.innerText = `${distanceKm} km`;
-    
-    const now = new Date();
-    now.setMinutes(now.getMinutes() + totalMinutes);
-    const arrivalTime = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     document.getElementById('nav-arrival')!.innerText = arrivalTime;
+    document.getElementById('nav-distance')!.innerText = `${(route.distance / 1000).toFixed(1)} km`;
+    
+    // Debug: Update status in UI
+    const statusEl = document.getElementById('loader-status');
+    if (statusEl) statusEl.innerText = 'Route Active';
 
     // Only speak the briefing, do not show narrative text in UI
-    const brief = `Starting route to ${dest}. Arrival expected at ${arrivalTime}.`;
     this.speakBriefing(brief);
     
-    this.map.executeCameraSequence(this.currentOriginCoords, this.currentDestCoords, route.coordinates);
+    // 2. Ensure vehicle is exactly at GPS start before transition
+    if (this.map.visualEffects) {
+      this.map.visualEffects.drawGlowingRoute(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
+    }
+
+    // 3. Smooth Camera Mode Transition: overview -> driver perspective
+    this.map.executeCameraSequence(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
+
+    // 4. Snap navigation system to exact starting coordinates (bypass smoothing)
+    let initialHeading = 0;
+    if (route.coordinates.length >= 2) {
+      const p1 = route.coordinates[0];
+      const p2 = route.coordinates[1];
+      initialHeading = (Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180) / Math.PI;
+    }
+    this.navSystem.snapToPosition(this.currentOriginCoords!, initialHeading);
+
+    // Setup Navigation System
+    this.navSystem.onUpdate = (state) => {
+      // Calculate dynamic ETA: remaining dist / current speed (or duration proportion if stopped)
+      const speedMs = state.speed > 1 ? state.speed : 13.8; // default to 50km/h if stopped
+      const remainingSeconds = state.totalDistanceRemaining / speedMs;
+      document.getElementById('nav-eta-time')!.innerText = this.formatDuration(remainingSeconds);
+      document.getElementById('nav-distance')!.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
+      
+      const { min, max } = this.navSystem.getZoomRange();
+      this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed, min, max);
+      if (this.map.visualEffects) {
+        if (state.isMoving) {
+          this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
+        } else {
+          // Keep vehicle upright without translation when stationary
+          const threeLayer = (this.map.visualEffects as any).threeVehicleLayer;
+          if (threeLayer && threeLayer.vehicleMesh) {
+            threeLayer.vehicleMesh.rotation.set(Math.PI / 2, 0, 0);
+          }
+        }
+      }
+
+      // Update Maneuver UI
+      const card = document.getElementById('maneuver-card')!;
+      if (state.isMoving) {
+        card.style.display = 'flex';
+        document.getElementById('maneuver-dist')!.innerText = `${Math.round(state.distanceToNext)} m`;
+        
+        // Find current step
+        const currentStep = route.steps[this.navSystem.currentStepIndex]; 
+        if (currentStep) {
+          document.getElementById('maneuver-instruction')!.innerText = currentStep.maneuver.instruction;
+          document.getElementById('maneuver-icon')!.innerText = this.getManeuverIcon(currentStep.maneuver.type);
+        }
+      }
+
+      // Periodic check for better route if position changed significantly
+      if (state.isMoving && Math.random() < 0.01) { // 1% chance every update (~10s)
+        this.currentOriginCoords = state.currentPosition;
+      }
+    };
+
+    // Auto-start Navigation Mode
+    this.map.enterNavigationMode();
+    if (this.map.visualEffects) this.map.visualEffects.dimMapLayers(true);
+    // Do NOT start the navigation animation here. It will be triggered when movement is detected.
+    this.navSystem.start(route, type);
+    
+    // Initialize Trip Data
+    this.tripStartTime = Date.now();
+    this.tripTotalDistance = route.distance;
+    this.tripIsActive = true;
+    document.getElementById('hazard-fab')!.style.display = 'flex';
+    
+    // Hook into navigation updates to start animation when vehicle begins moving
+    const originalOnUpdate = this.navSystem.onUpdate;
+    this.navSystem.onUpdate = (state) => {
+      // Forward existing update handling
+      if (originalOnUpdate) originalOnUpdate(state);
+      // Start animation only when movement detected
+      if (state.isMoving && this.map.visualEffects) {
+        this.map.visualEffects.startNavigationAnimation();
+      }
+    };
+    
+    this.navSystem.onOffRoute = () => {
+      console.log('[Navigation] Deviation detected. Re-routing...');
+      this.speakBriefing("Recalculating route.");
+      this.finalizeRouting(this.currentTransportType);
+    };
+  }
+
+  public reportHazard(type: string) {
+    if (!this.currentOriginCoords) return;
+    const pos = this.navSystem.getCurrentPosition() || this.currentOriginCoords;
+    intelligence.report({
+      type: 'HAZARD',
+      payload: { type, location: pos },
+      timestamp: Date.now()
+    });
+    this.speakBriefing(`Reporting ${type} at current location.`);
+  }
+
+  private showTripSummary() {
+    const durationMs = Date.now() - this.tripStartTime;
+    const durationMins = Math.floor(durationMs / 60000);
+    const avgSpeed = (this.tripTotalDistance / (durationMs / 3600000)).toFixed(1);
+
+    document.getElementById('sum-dist')!.innerText = `${(this.tripTotalDistance / 1000).toFixed(1)} km`;
+    document.getElementById('sum-time')!.innerText = `${durationMins} min`;
+    document.getElementById('sum-avg-speed')!.innerText = `${avgSpeed} km/h`;
+    document.getElementById('summary-modal')!.style.display = 'block';
+  }
+
+  public closeSummary() {
+    document.getElementById('summary-modal')!.style.display = 'none';
+  }
+
+  private getManeuverIcon(type: string): string {
+    switch (type) {
+      case 'turn': return '⤴';
+      case 'continue': return '↑';
+      case 'merge': return 'Merge';
+      case 'depart': return '🏁';
+      case 'arrive': return '📍';
+      default: return '↑';
+    }
+  }
+
+  private formatDuration(seconds: number): string {
+    const mins = Math.floor(seconds / 60);
+    const hours = Math.floor(mins / 60);
+    return hours > 0 ? `${hours}h ${mins % 60}m` : `${mins}m`;
   }
 
   private speakBriefing(text: string) {
