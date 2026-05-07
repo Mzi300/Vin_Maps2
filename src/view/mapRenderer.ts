@@ -11,8 +11,6 @@ export class MapRenderer {
   private isNavigationMode: boolean = false;
   private targetZoom: number = 18;
   private currentZoom: number = 18;
-  private isOrbiting: boolean = false;
-  private orbitAngle: number = 0;
   private lastHeading: number = 0;
   private currentHeading: number = 0;
   private currentRoll: number = 0;
@@ -240,7 +238,7 @@ export class MapRenderer {
    *  -------------------------------------------------------------- */
   public flyTo(lng: number, lat: number, zoom: number = 18.5) {
     this.stopRotation();
-    this.isOrbiting = false;
+    // Locked
     this.map.flyTo({
       center: [lng, lat],
       zoom: zoom,
@@ -280,7 +278,7 @@ export class MapRenderer {
       initialBearing = (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI;
     }
 
-    this.isOrbiting = false;
+    // Locked
     this.stopRotation();
     
     // 2. Immediate Focus: Fly to origin facing the correct direction
@@ -435,17 +433,8 @@ export class MapRenderer {
 
     // Update Visual Effects Guidance system if destination is set
     if (this.visualEffects && this.visualEffects.getDestination()) {
-      this.visualEffects.updateGuidanceSystem(coords, this.visualEffects.getDestination()!, speed);
+      this.visualEffects.updateGuidanceSystem(coords, this.visualEffects.getDestination()!);
     }
   }
 
-  private startOrbitAnimation() {
-    const orbit = () => {
-      if (!this.isOrbiting) return;
-      this.orbitAngle += 0.05;
-      this.map.setBearing(this.orbitAngle % 360);
-      requestAnimationFrame(orbit);
-    };
-    orbit();
-  }
 }

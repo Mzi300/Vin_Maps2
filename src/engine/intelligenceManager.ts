@@ -59,6 +59,13 @@ class IntelligenceManager extends EventEmitter {
     };
     this.emit('intelligence-update', update);
   }
+
+  public generateTacticalBriefing(route: any, transportType: string): { brief: string } {
+    const distanceKm = (route.distance / 1000).toFixed(1);
+    const timeMins = Math.round(route.duration / 60);
+    const brief = `Tactical route established. Covering ${distanceKm} kilometers via ${transportType}. Estimated extraction time: ${timeMins} minutes. Sector conditions: Dynamic.`;
+    return { brief };
+  }
 }
 
 export const intelligence = new IntelligenceManager();

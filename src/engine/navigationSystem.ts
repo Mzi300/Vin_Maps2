@@ -101,6 +101,10 @@ export class NavigationSystem {
       return;
     }
 
+    const rawDist = this.calculateDistance(this.lastPosition, newPos);
+    const dt = (now - this.lastTime) / 1000; // seconds
+    let rawSpeed = dt > 0 ? rawDist / dt : 0;
+
     // 0.5 GPS Spike Rejection: discard unrealistic jumps (e.g., > 100m in <2s or speed > 50 m/s)
     const maxSpikeSpeed = 50; // m/s (~180 km/h)
     if (rawSpeed > maxSpikeSpeed) {
@@ -108,9 +112,6 @@ export class NavigationSystem {
       // Do not update lastPosition/time to avoid contaminating future calculations
       return;
     }
-    const rawDist = this.calculateDistance(this.lastPosition, newPos);
-    const dt = (now - this.lastTime) / 1000; // seconds
-    let rawSpeed = dt > 0 ? rawDist / dt : 0;
 
     // 2. Dead-Zone Logic
     // If movement is negligible and speed is low, assume stationary to avoid jitter

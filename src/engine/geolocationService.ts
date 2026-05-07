@@ -1,15 +1,12 @@
-import type { Map } from 'mapbox-gl';
+// import type { Map } from 'mapbox-gl';
 
 export class GeolocationService {
-  private map: Map;
   private defaultLocation: [number, number] = [28.0163, -26.2307]; // Boswell Avenue, Mondeor
 
-  constructor(map: any) {
-    this.map = map;
-  }
+  constructor(_map: any) {}
 
   public async getCurrentLocation(): Promise<[number, number]> {
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       if (!navigator.geolocation) {
         resolve(this.defaultLocation);
         return;

@@ -578,7 +578,7 @@ class App {
     if (this.map.visualEffects) {
       this.map.visualEffects.setTransportMode(TRANSPORT_PROFILES[type].icon);
     }
-    const dest = (document.getElementById('final-dest-display') as HTMLInputElement).value;
+    // const dest = (document.getElementById('final-dest-display') as HTMLInputElement).value;
     
     // 1. Critical GPS Auto-Lock: Fetch fresh accurate position before calculating route
     const statusText = document.getElementById('loader-status');
@@ -603,8 +603,8 @@ class App {
       } else {
         const profile = type === 'car' ? 'driving' : type === 'pedestrian' ? 'walking' : 'driving';
         route = await this.routeOptimizer.fetchAndOptimizeRoute(
-          this.currentOriginCoords, 
-          this.currentDestCoords, 
+          this.currentOriginCoords!, 
+          this.currentDestCoords!, 
           profile,
           this.routingAbortController.signal
         );
@@ -618,10 +618,13 @@ class App {
       return;
     }
 
+    const { brief } = intelligence.generateTacticalBriefing(route, type);
+    const arrivalTime = new Date(Date.now() + route.duration * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     this.updateUIState(RoutingState.READY);
     
     // FORMAT DATA FOR CLEAN DISPLAY
-    const distanceKm = Math.round(route.distance / 1000);
+    // const distanceKm = Math.round(route.distance / 1000);
     const totalMinutes = Math.floor(route.duration / 60);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
@@ -640,12 +643,14 @@ class App {
     this.speakBriefing(brief);
     
     // 2. Ensure vehicle is exactly at GPS start before transition
-    if (this.map.visualEffects) {
+    if (this.map.visualEffects && this.currentDestCoords) {
       this.map.visualEffects.drawGlowingRoute(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
     }
 
     // 3. Smooth Camera Mode Transition: overview -> driver perspective
-    this.map.executeCameraSequence(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
+    if (this.currentDestCoords) {
+      this.map.executeCameraSequence(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
+    }
 
     // 4. Snap navigation system to exact starting coordinates (bypass smoothing)
     let initialHeading = 0;

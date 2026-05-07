@@ -7,6 +7,7 @@ export class VisualEffects {
   private map: Map;
   private animationId: number | null = null;
   private trafficPointCoords: [number, number] = [0, 0];
+  private routeCoords: [number, number][] = [];
   private transportEmoji: string = '🚗';
   private vehicleMarker: mapboxgl.Marker | null = null;
   private currentSegmentIndex: number = 0;
@@ -342,7 +343,7 @@ export class VisualEffects {
    * 4. Guidance System
    * Updates a directional beam/arrow from vehicle to destination
    */
-  public updateGuidanceSystem(vehiclePos: [number, number], destPos: [number, number], speed: number) {
+  public updateGuidanceSystem(vehiclePos: [number, number], destPos: [number, number]) {
     // 1. Update guidance beam source
     const beamGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
       type: 'FeatureCollection',
