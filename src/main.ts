@@ -365,15 +365,16 @@ class App {
     document.getElementById('close-sidebar')?.addEventListener('click', () => sidebar?.classList.remove('open'));
 
     document.getElementById('toggle-advanced')?.addEventListener('click', () => {
-      const panel = document.getElementById('advanced-details')!;
+      const panel = document.getElementById('advanced-details');
+      if (!panel) return;
       const isHidden = panel.style.display === 'none';
       panel.style.display = isHidden ? 'block' : 'none';
-      document.getElementById('toggle-advanced')!.innerText = isHidden ? 'Advanced Tactical Data ▲' : 'Advanced Tactical Data ▼';
+      const toggleBtn = document.getElementById('toggle-advanced');
+      if (toggleBtn) toggleBtn.innerText = isHidden ? 'Advanced Tactical Data ▲' : 'Advanced Tactical Data ▼';
     });
 
     document.getElementById('exit-nav')?.addEventListener('click', () => {
       this.resetToSearch();
-      document.querySelector('.dropdown-container')!.classList.remove('hidden');
     });
 
     document.getElementById('recenter-btn')?.addEventListener('click', () => {
