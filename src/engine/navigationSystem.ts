@@ -118,11 +118,13 @@ export class NavigationSystem {
       return;
     }
 
-    // 2. Dead-Zone Logic
+    // 2. Dead-Zone Logic (Stationary Lock)
     // If movement is negligible and speed is low, assume stationary to avoid jitter
-    if (rawDist < this.MIN_MOVEMENT_THRESHOLD && rawSpeed < this.speedThreshold) {
+    // We use a more aggressive threshold (3.5m) to keep the icon rock-solid
+    if (rawDist < 3.5 && rawSpeed < this.speedThreshold) {
       this.currentState.isMoving = false;
       this.currentState.speed = 0;
+      // Do not update currentPosition or heading here to keep it locked
       this.lastTime = now;
       if (this.onUpdate) this.onUpdate(this.currentState);
       return;
@@ -141,9 +143,10 @@ export class NavigationSystem {
       this.currentState.currentPosition[1] + (newPos[1] - this.currentState.currentPosition[1]) * this.smoothingFactor
     ];
 
-    // 5. Heading Calculation with damping
+    // 5. Heading Calculation with speed-gate
     let heading = this.currentState.heading;
-    if (rawDist > 1.5) { // Threshold for bearing update
+    // Only update heading if we are moving at a decent speed (> 2m/s) to avoid "spinning" at stops
+    if (rawDist > 2.5 && smoothedSpeed > 2.0) { 
       heading = (Math.atan2(newPos[0] - this.lastPosition[0], newPos[1] - this.lastPosition[1]) * 180) / Math.PI;
     }
 
