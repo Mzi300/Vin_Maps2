@@ -36,11 +36,14 @@ export class NavigationSystem {
     isMoving: false
   };
 
+  private hasDetectedMotion: boolean = false;
+
   public onUpdate?: (state: NavState) => void;
   public onStepChange?: (step: any) => void;
   public onOffRoute?: () => void;
 
   public snapToPosition(pos: [number, number], heading: number) {
+    this.hasDetectedMotion = false; // Reset gate
     this.currentState = {
       currentPosition: pos,
       heading: heading,
@@ -52,8 +55,8 @@ export class NavigationSystem {
     this.lastPosition = pos;
     this.lastTime = Date.now();
   }
-
   public start(route: OptimizedRoute, profile: string = 'driving') {
+    this.hasDetectedMotion = false; // Reset gate
     this.route = route;
     this.currentStepIndex = 0;
     this.configureProfile(profile);
@@ -153,6 +156,19 @@ export class NavigationSystem {
 
     const isMoving = smoothedSpeed > this.speedThreshold;
 
+    // 6. Motion Gate: Stay at start line until real movement is detected
+    if (!this.hasDetectedMotion) {
+      const distFromStart = this.calculateDistance(this.currentState.currentPosition, smoothedPos);
+      // Require either decent speed or significant distance to "unlock" the vehicle
+      if (smoothedSpeed > 2.0 || distFromStart > 10.0) {
+        this.hasDetectedMotion = true;
+        console.log('[NavigationSystem] Motion detected - Unlocking vehicle icon.');
+      } else {
+        // Keep it locked to the previous stable position
+        return;
+      }
+    }
+
     this.currentState = {
       currentPosition: smoothedPos,
       heading: heading,
@@ -162,10 +178,10 @@ export class NavigationSystem {
       totalDistanceRemaining: this.route ? this.calculateTotalDistanceRemaining(smoothedPos) : 0
     };
 
-    // 6. Maneuver & Step Tracking
+    // 7. Maneuver & Step Tracking
     if (this.route) this.trackManeuvers(smoothedPos);
 
-    // 7. Off-Route Detection
+    // 8. Off-Route Detection
     if (this.route) this.checkOffRoute(smoothedPos);
 
     this.lastPosition = newPos;
