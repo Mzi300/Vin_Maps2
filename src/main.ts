@@ -585,19 +585,28 @@ class App {
     if (this.routingAbortController) this.routingAbortController.abort();
     if (this.map.visualEffects) this.map.visualEffects.clearRoute();
     
-    document.getElementById('search-view')!.style.display = 'flex';
-    document.getElementById('directions-view')!.style.display = 'none';
-    document.getElementById('nav-bottom-bar')!.style.display = 'none';
-    document.getElementById('info-readout')!.style.display = 'block';
-    document.querySelector('.category-bar')!.classList.remove('hidden');
-    
-    document.getElementById('maneuver-card')!.style.display = 'none';
-    document.getElementById('hazard-fab')!.style.display = 'none';
+    const searchView = document.getElementById('search-view');
+    const directionsView = document.getElementById('directions-view');
+    const navBottomBar = document.getElementById('nav-bottom-bar');
+    const infoReadout = document.getElementById('info-readout');
+    const categoryBar = document.querySelector('.category-bar');
+    const maneuverCard = document.getElementById('maneuver-card');
+    const hazardFab = document.getElementById('hazard-fab');
+
+    if (searchView) searchView.style.display = 'flex';
+    if (directionsView) directionsView.style.display = 'none';
+    if (navBottomBar) navBottomBar.style.display = 'none';
+    if (infoReadout) infoReadout.style.display = 'block';
+    if (categoryBar) categoryBar.classList.remove('hidden');
+    if (maneuverCard) maneuverCard.style.display = 'none';
+    if (hazardFab) hazardFab.style.display = 'none';
 
     if (this.tripIsActive) this.showTripSummary();
     this.tripIsActive = false;
 
     this.updateUIState(RoutingState.IDLE);
+    
+    if (this.map.renderer) this.map.renderer.exitNavigationMode();
   }
 
   private async finalizeRouting(type: TransportType) {
@@ -666,12 +675,15 @@ class App {
     const totalMinutes = Math.floor(route.duration / 60);
     const hours = Math.floor(totalMinutes / 60);
     const mins = totalMinutes % 60;
-    
     const etaFormatted = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
 
-    document.getElementById('nav-eta-time')!.innerText = etaFormatted;
-    document.getElementById('nav-arrival')!.innerText = arrivalTime;
-    document.getElementById('nav-distance')!.innerText = `${(route.distance / 1000).toFixed(1)} km`;
+    const etaTimeEl = document.getElementById('nav-eta-time');
+    const arrivalEl = document.getElementById('nav-arrival');
+    const distanceEl = document.getElementById('nav-distance');
+    
+    if (etaTimeEl) etaTimeEl.innerText = etaFormatted;
+    if (arrivalEl) arrivalEl.innerText = arrivalTime;
+    if (distanceEl) distanceEl.innerText = `${(route.distance / 1000).toFixed(1)} km`;
     
     // Debug: Update status in UI
     const statusEl = document.getElementById('loader-status');
@@ -702,14 +714,19 @@ class App {
     // Setup Navigation System is handled by the global setupNavigationStateListener
 
     // Auto-start Navigation Mode
-    this.map.enterNavigationMode();
+    if (this.map.enterNavigationMode) this.map.enterNavigationMode();
     if (this.map.visualEffects) this.map.visualEffects.dimMapLayers(true);
     
     // Show Navigation UI
-    document.getElementById('directions-view')!.style.display = 'none';
-    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
-    document.getElementById('info-readout')!.style.display = 'none';
-    document.querySelector('.category-bar')?.classList.add('hidden');
+    const dirView = document.getElementById('directions-view');
+    const navBar = document.getElementById('nav-bottom-bar');
+    const infoCard = document.getElementById('info-readout');
+    const catBar = document.querySelector('.category-bar');
+
+    if (dirView) dirView.style.display = 'none';
+    if (navBar) navBar.style.display = 'flex';
+    if (infoCard) infoCard.style.display = 'none';
+    if (catBar) catBar.classList.add('hidden');
 
     this.navSystem.start(route, type);
     
@@ -717,7 +734,9 @@ class App {
     this.tripStartTime = Date.now();
     this.tripTotalDistance = route.distance;
     this.tripIsActive = true;
-    document.getElementById('hazard-fab')!.style.display = 'flex';
+    
+    const hazardFab = document.getElementById('hazard-fab');
+    if (hazardFab) hazardFab.style.display = 'flex';
     
     // Hook into off-route detection
     this.navSystem.onOffRoute = () => {
