@@ -27,10 +27,10 @@ export class MapRenderer {
     this.map = new mapboxgl.Map({
       container: this.containerId,
       style: 'mapbox://styles/mapbox/standard',
-      center: [28.0436, -26.2023],
-      zoom: 16.2,
-      pitch: 65,
-      bearing: 0,
+      center: [28.0473, -26.2041], // Tactical center from screenshot
+      zoom: 15.7,                  // Matching building scale
+      pitch: 60,                   // Matching 3D perspective
+      bearing: -17.6,              // Matching street alignment
 
       antialias: true,
       interactive: true,
