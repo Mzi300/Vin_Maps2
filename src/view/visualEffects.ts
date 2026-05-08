@@ -8,7 +8,6 @@ export class VisualEffects {
   private animationId: number | null = null;
   private trafficPointCoords: [number, number] = [0, 0];
   private routeCoords: [number, number][] = [];
-  private transportEmoji: string = '🚗';
   private vehicleMarker: mapboxgl.Marker | null = null;
   private currentSegmentIndex: number = 0;
   private segmentProgress: number = 0;
@@ -251,7 +250,6 @@ export class VisualEffects {
   }
 
   public setTransportMode(emoji: string) {
-    this.transportEmoji = emoji;
     if (this.vehicleMarker) {
       this.vehicleMarker.getElement().innerText = emoji;
     }

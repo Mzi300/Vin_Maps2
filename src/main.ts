@@ -284,11 +284,15 @@ class App {
   }
 
   private updateUIState(state: RoutingStateValue) {
+    const statusText = document.getElementById('loader-status');
+    const reasoning = document.getElementById('ai-reasoning')!;
     const status = document.getElementById('route-title')!;
     const eta = document.getElementById('route-eta')!;
 
     switch (state) {
       case RoutingState.IDLE:
+        if (statusText) statusText.innerText = 'Ready';
+        reasoning.style.display = 'none';
         document.getElementById('route-idle')!.style.display = 'block';
         document.getElementById('route-active')!.style.display = 'none';
         document.getElementById('advanced-toggle-area')!.style.display = 'none';
@@ -299,20 +303,28 @@ class App {
         eta.innerText = 'Synchronizing geocoding...';
         break;
       case RoutingState.CALCULATING:
+        if (statusText) statusText.innerText = 'Calculating Tactical Route...';
+        reasoning.style.display = 'block';
+        reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
         document.getElementById('route-idle')!.style.display = 'block';
         document.getElementById('route-active')!.style.display = 'none';
         status.innerText = '[ CALCULATING ROUTE ]';
         eta.innerHTML = `<span style="color:var(--warning)">PROCESSING...</span>`;
         break;
       case RoutingState.READY:
+        if (statusText) statusText.innerText = 'Tactical Route Established';
+        reasoning.style.display = 'block';
         document.getElementById('route-idle')!.style.display = 'none';
-        document.getElementById('route-active')!.style.display = 'none'; // HIDE SUMMARY AS REQUESTED
-        document.getElementById('info-readout')!.style.display = 'none'; // HIDE CARD
+        document.getElementById('route-active')!.style.display = 'none'; 
+        document.getElementById('info-readout')!.style.display = 'none'; 
         document.getElementById('advanced-toggle-area')!.style.display = 'none';
         document.querySelector('.dropdown-container')!.classList.add('hidden');
         document.getElementById('nav-bottom-bar')!.style.display = 'flex';
         break;
       case RoutingState.ERROR:
+        if (statusText) statusText.innerText = 'Routing Failed';
+        reasoning.style.display = 'block';
+        reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
         document.getElementById('route-idle')!.style.display = 'block';
         document.getElementById('route-active')!.style.display = 'none';
         status.innerText = '[ ERROR ]';
@@ -838,31 +850,6 @@ class App {
     feed.prepend(alert);
   }
 
-  private updateUIState(state: RoutingStateValue) {
-    const statusText = document.getElementById('loader-status');
-    const reasoning = document.getElementById('ai-reasoning')!;
-    
-    switch (state) {
-      case RoutingState.IDLE:
-        if (statusText) statusText.innerText = 'Ready';
-        reasoning.style.display = 'none';
-        break;
-      case RoutingState.CALCULATING:
-        if (statusText) statusText.innerText = 'Calculating Tactical Route...';
-        reasoning.style.display = 'block';
-        reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
-        break;
-      case RoutingState.READY:
-        if (statusText) statusText.innerText = 'Tactical Route Established';
-        reasoning.style.display = 'block';
-        break;
-      case RoutingState.ERROR:
-        if (statusText) statusText.innerText = 'Routing Failed';
-        reasoning.style.display = 'block';
-        reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
-        break;
-    }
-  }
 }
 
 new App();

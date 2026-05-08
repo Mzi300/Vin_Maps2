@@ -1,11 +1,11 @@
-import mapboxgl from 'mapbox-gl';
+export const CameraMode = {
+  DRIVING: 'DRIVING',
+  OVERVIEW: 'OVERVIEW',
+  RECENTER: 'RECENTER',
+  FREE_EXPLORE: 'FREE_EXPLORE'
+} as const;
 
-export enum CameraMode {
-  DRIVING = 'DRIVING',
-  OVERVIEW = 'OVERVIEW',
-  RECENTER = 'RECENTER',
-  FREE_EXPLORE = 'FREE_EXPLORE'
-}
+export type CameraMode = typeof CameraMode[keyof typeof CameraMode];
 
 interface CameraState {
   center: [number, number];
