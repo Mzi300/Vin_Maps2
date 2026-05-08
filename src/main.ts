@@ -318,7 +318,8 @@ class App {
         document.getElementById('route-active')!.style.display = 'none'; 
         document.getElementById('info-readout')!.style.display = 'none'; 
         document.getElementById('advanced-toggle-area')!.style.display = 'none';
-        document.querySelector('.dropdown-container')!.classList.add('hidden');
+        const dropdown = document.querySelector('.dropdown-container');
+        if (dropdown) dropdown.classList.add('hidden');
         document.getElementById('nav-bottom-bar')!.style.display = 'flex';
         break;
       case RoutingState.ERROR:

@@ -461,8 +461,13 @@ export class VisualEffects {
   public clearRoute() {
     if (this.animationId) cancelAnimationFrame(this.animationId);
     if (this.destMarker) this.destMarker.remove();
+    
+    // Remove layers FIRST in reverse order of dependency
+    if (this.map.getLayer('neon-route-arrows')) this.map.removeLayer('neon-route-arrows');
     if (this.map.getLayer('neon-route-core')) this.map.removeLayer('neon-route-core');
     if (this.map.getLayer('neon-route-glow')) this.map.removeLayer('neon-route-glow');
+    
+    // Remove source LAST
     if (this.map.getSource('neon-route-source')) this.map.removeSource('neon-route-source');
   }
 
