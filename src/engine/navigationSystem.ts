@@ -120,11 +120,12 @@ export class NavigationSystem {
 
     // 2. Dead-Zone Logic (Stationary Lock)
     // If movement is negligible and speed is low, assume stationary to avoid jitter
-    // We use a more aggressive threshold (3.5m) to keep the icon rock-solid
-    if (rawDist < 3.5 && rawSpeed < this.speedThreshold) {
+    // We use a strict threshold (5.0m) to keep the icon rock-solid
+    if (rawDist < 5.0 && rawSpeed < this.speedThreshold) {
       this.currentState.isMoving = false;
       this.currentState.speed = 0;
-      // Do not update currentPosition or heading here to keep it locked
+      this.lastSpeed = 0; // CRITICAL: Stop extrapolation
+      this.lastPosition = newPos; // Sync to stop future jumps
       this.lastTime = now;
       if (this.onUpdate) this.onUpdate(this.currentState);
       return;
