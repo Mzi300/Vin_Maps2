@@ -281,7 +281,7 @@ export class MapRenderer {
     // 2. Immediate Focus: Fly to origin facing the correct direction
     this.map.flyTo({
       center: origin,
-      zoom: 19,
+      zoom: 20,
       pitch: 75,
       bearing: initialBearing,
       duration: 800, // Faster transition
@@ -294,7 +294,7 @@ export class MapRenderer {
       
       this.map.easeTo({
         center: origin,
-        zoom: 19,
+        zoom: 20,
         pitch: 75,
         bearing: initialBearing,
         duration: 200 // Final snap
