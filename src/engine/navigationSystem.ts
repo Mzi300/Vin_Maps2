@@ -25,7 +25,7 @@ export class NavigationSystem {
   public currentStepIndex: number = 0;
   private voiceQueue: string[] = [];
   private isSpeaking: boolean = false;
-  private offRouteThreshold: number = 50; // meters
+  private offRouteThreshold: number = 100; // meters (more generous to allow for GPS jitter)
   
   private currentState: NavState = {
     currentPosition: [0, 0],
@@ -57,8 +57,11 @@ export class NavigationSystem {
     this.route = route;
     this.currentStepIndex = 0;
     this.configureProfile(profile);
+    this.startTracking();
+  }
 
-    if (this.watchId !== null) navigator.geolocation.clearWatch(this.watchId);
+  public startTracking() {
+    if (this.watchId !== null) return;
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => this.handlePositionUpdate(pos),
@@ -85,6 +88,8 @@ export class NavigationSystem {
 
   private handlePositionUpdate(pos: GeolocationPosition) {
     const { longitude, latitude, accuracy } = pos.coords;
+    if (longitude === 0 && latitude === 0) return; // Ignore placeholder/failed coordinates
+    
     const now = performance.now();
     const newPos: [number, number] = [longitude, latitude];
 
@@ -149,15 +154,15 @@ export class NavigationSystem {
       heading: heading,
       speed: smoothedSpeed,
       isMoving: isMoving,
-      distanceToNext: this.calculateDistanceToNextStep(smoothedPos),
-      totalDistanceRemaining: this.calculateTotalDistanceRemaining(smoothedPos)
+      distanceToNext: this.route ? this.calculateDistanceToNextStep(smoothedPos) : 0,
+      totalDistanceRemaining: this.route ? this.calculateTotalDistanceRemaining(smoothedPos) : 0
     };
 
     // 6. Maneuver & Step Tracking
-    this.trackManeuvers(smoothedPos);
+    if (this.route) this.trackManeuvers(smoothedPos);
 
     // 7. Off-Route Detection
-    this.checkOffRoute(smoothedPos);
+    if (this.route) this.checkOffRoute(smoothedPos);
 
     this.lastPosition = newPos;
     this.lastTime = now;
@@ -264,10 +269,12 @@ export class NavigationSystem {
     }
   }
 
+  private offRouteCount: number = 0;
+  private readonly OFF_ROUTE_SAMPLES_REQUIRED = 3;
+
   private checkOffRoute(pos: [number, number]) {
     if (!this.route) return;
     
-    // Simplified off-route check: distance to the nearest point in the route
     let minDistance = Infinity;
     for (let i = 0; i < this.route.coordinates.length; i++) {
       const d = this.calculateDistance(pos, this.route.coordinates[i]);
@@ -275,7 +282,13 @@ export class NavigationSystem {
     }
 
     if (minDistance > this.offRouteThreshold) {
-      if (this.onOffRoute) this.onOffRoute();
+      this.offRouteCount++;
+      if (this.offRouteCount >= this.OFF_ROUTE_SAMPLES_REQUIRED) {
+        if (this.onOffRoute) this.onOffRoute();
+        this.offRouteCount = 0; // Reset after trigger
+      }
+    } else {
+      this.offRouteCount = 0;
     }
   }
 

@@ -252,10 +252,19 @@ class App {
 
       geoService.initializeLocation((coords) => {
         this.currentOriginCoords = coords;
-        this.map.flyTo(coords[0], coords[1], 15.5); // Moderate zoom for initial lock
+        this.map.flyTo(coords[0], coords[1], 15.5); 
+        
         if (this.map.visualEffects) {
           (this.map.visualEffects as any).updateUserLocationGlow(coords);
         }
+
+        // 1. Start continuous tracking and enter follow mode by default
+        this.navSystem.startTracking();
+        this.map.enterNavigationMode();
+
+        // 2. Setup the global update listener early to track vehicle before routing
+        this.setupNavigationStateListener();
+
         if (loader) {
           loader.classList.add('hidden');
           setTimeout(() => loader.remove(), 800);
@@ -355,7 +364,7 @@ class App {
     });
 
     document.getElementById('recenter-btn')?.addEventListener('click', () => {
-      if (this.map.visualEffects) this.map.visualEffects.recenter();
+      this.map.recenter();
     });
 
     window.addEventListener('nav-camera-unlocked', () => {
@@ -530,12 +539,17 @@ class App {
     if (this.currentOriginCoords && this.currentDestCoords) {
       if (this.routingAbortController) this.routingAbortController.abort();
       this.routingAbortController = new AbortController();
+      
+      console.log('[App] Pre-fetching route...');
       this.pendingRoutePromise = this.routeOptimizer.fetchAndOptimizeRoute(
         this.currentOriginCoords, 
         this.currentDestCoords, 
         'driving',
         this.routingAbortController.signal
-      ).then(async route => {
+      ).catch(err => {
+        console.error('[App] Pre-fetch failed:', err);
+        return null;
+      }).then(async route => {
         if (route) {
           // Wait for map to be ready and visualEffects to be initialized
           let attempts = 0;
@@ -584,23 +598,31 @@ class App {
     const statusText = document.getElementById('loader-status');
     if (statusText) statusText.innerText = 'Synchronizing GPS lock...';
     
-    const geoService = new GeolocationService(this.map.map);
-    const freshPos = await new Promise<[number, number]>((resolve) => {
-      geoService.initializeLocation((coords) => resolve(coords));
-    });
-
-    this.currentOriginCoords = freshPos;
+    if (!this.currentOriginCoords) {
+      const geoService = new GeolocationService(this.map.map);
+      this.currentOriginCoords = await new Promise<[number, number]>((resolve) => {
+        const timeout = setTimeout(() => resolve([28.0163, -26.2307]), 3000);
+        geoService.initializeLocation((coords) => {
+          clearTimeout(timeout);
+          resolve(coords);
+        });
+      });
+    }
     this.updateUIState(RoutingState.CALCULATING);
 
     if (this.routingAbortController) this.routingAbortController.abort();
     this.routingAbortController = new AbortController();
 
+    console.log('[App] Starting finalizeRouting for type:', type);
+    
     let route: OptimizedRoute | null = null;
     try {
       if (this.pendingRoutePromise) {
+        console.log('[App] Using pendingRoutePromise...');
         route = await this.pendingRoutePromise;
         this.pendingRoutePromise = null;
       } else {
+        console.log('[App] Fetching new route...');
         const profile = type === 'car' ? 'driving' : type === 'pedestrian' ? 'walking' : 'driving';
         route = await this.routeOptimizer.fetchAndOptimizeRoute(
           this.currentOriginCoords!, 
@@ -610,8 +632,11 @@ class App {
         );
       }
     } catch (err: any) {
+      console.error('[App] Routing error:', err);
       if (err.name === 'AbortError') return;
     }
+
+    console.log('[App] Route received:', route ? 'SUCCESS' : 'NULL');
 
     if (!route) {
       this.updateUIState(RoutingState.ERROR);
@@ -661,52 +686,18 @@ class App {
     }
     this.navSystem.snapToPosition(this.currentOriginCoords!, initialHeading);
 
-    // Setup Navigation System
-    this.navSystem.onUpdate = (state) => {
-      // Calculate dynamic ETA: remaining dist / current speed (or duration proportion if stopped)
-      const speedMs = state.speed > 1 ? state.speed : 13.8; // default to 50km/h if stopped
-      const remainingSeconds = state.totalDistanceRemaining / speedMs;
-      document.getElementById('nav-eta-time')!.innerText = this.formatDuration(remainingSeconds);
-      document.getElementById('nav-distance')!.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
-      
-      const { min, max } = this.navSystem.getZoomRange();
-      this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed, min, max);
-      if (this.map.visualEffects) {
-        if (state.isMoving) {
-          this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
-        } else {
-          // Keep vehicle upright without translation when stationary
-          const threeLayer = (this.map.visualEffects as any).threeVehicleLayer;
-          if (threeLayer && threeLayer.vehicleMesh) {
-            threeLayer.vehicleMesh.rotation.set(Math.PI / 2, 0, 0);
-          }
-        }
-      }
-
-      // Update Maneuver UI
-      const card = document.getElementById('maneuver-card')!;
-      if (state.isMoving) {
-        card.style.display = 'flex';
-        document.getElementById('maneuver-dist')!.innerText = `${Math.round(state.distanceToNext)} m`;
-        
-        // Find current step
-        const currentStep = route.steps[this.navSystem.currentStepIndex]; 
-        if (currentStep) {
-          document.getElementById('maneuver-instruction')!.innerText = currentStep.maneuver.instruction;
-          document.getElementById('maneuver-icon')!.innerText = this.getManeuverIcon(currentStep.maneuver.type);
-        }
-      }
-
-      // Periodic check for better route if position changed significantly
-      if (state.isMoving && Math.random() < 0.01) { // 1% chance every update (~10s)
-        this.currentOriginCoords = state.currentPosition;
-      }
-    };
+    // Setup Navigation System is handled by the global setupNavigationStateListener
 
     // Auto-start Navigation Mode
     this.map.enterNavigationMode();
     if (this.map.visualEffects) this.map.visualEffects.dimMapLayers(true);
-    // Do NOT start the navigation animation here. It will be triggered when movement is detected.
+    
+    // Show Navigation UI
+    document.getElementById('directions-view')!.style.display = 'none';
+    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
+    document.getElementById('info-readout')!.style.display = 'none';
+    document.querySelector('.category-bar')?.classList.add('hidden');
+
     this.navSystem.start(route, type);
     
     // Initialize Trip Data
@@ -715,17 +706,7 @@ class App {
     this.tripIsActive = true;
     document.getElementById('hazard-fab')!.style.display = 'flex';
     
-    // Hook into navigation updates to start animation when vehicle begins moving
-    const originalOnUpdate = this.navSystem.onUpdate;
-    this.navSystem.onUpdate = (state) => {
-      // Forward existing update handling
-      if (originalOnUpdate) originalOnUpdate(state);
-      // Start animation only when movement detected
-      if (state.isMoving && this.map.visualEffects) {
-        this.map.visualEffects.startNavigationAnimation();
-      }
-    };
-    
+    // Hook into off-route detection
     this.navSystem.onOffRoute = () => {
       console.log('[Navigation] Deviation detected. Re-routing...');
       this.speakBriefing("Recalculating route.");
@@ -794,6 +775,50 @@ class App {
     this.map.setPoiFilter(category);
   }
 
+  private setupNavigationStateListener() {
+    this.navSystem.onUpdate = (state) => {
+      // Update camera follow mode
+      const { min, max } = this.navSystem.getZoomRange();
+      this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed, min, max);
+
+      // Update vehicle visually
+      if (this.map.visualEffects) {
+        this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
+      }
+
+      // If a route is active, update the UI
+      const navBottomBar = document.getElementById('nav-bottom-bar');
+      if (navBottomBar && navBottomBar.style.display === 'flex') {
+        const speedMs = state.speed > 1 ? state.speed : 13.8; 
+        const remainingSeconds = state.totalDistanceRemaining / speedMs;
+        document.getElementById('nav-eta-time')!.innerText = this.formatDuration(remainingSeconds);
+        document.getElementById('nav-distance')!.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
+
+        // Update Maneuver UI
+        const card = document.getElementById('maneuver-card')!;
+        if (state.isMoving) {
+          card.style.display = 'flex';
+          document.getElementById('maneuver-dist')!.innerText = `${Math.round(state.distanceToNext)} m`;
+          
+          // Start animation only when movement detected
+          if (this.map.visualEffects) {
+            this.map.visualEffects.startNavigationAnimation();
+          }
+
+          // Find current step from the active route
+          const route = (this.navSystem as any).route; 
+          if (route && route.steps) {
+            const currentStep = route.steps[this.navSystem.currentStepIndex]; 
+            if (currentStep) {
+              document.getElementById('maneuver-instruction')!.innerText = currentStep.maneuver.instruction;
+              document.getElementById('maneuver-icon')!.innerText = this.getManeuverIcon(currentStep.maneuver.type);
+            }
+          }
+        }
+      }
+    };
+  }
+
   private typeWriter(element: HTMLElement, text: string) {
     element.innerText = '';
     let i = 0;
@@ -811,6 +836,32 @@ class App {
     alert.className = `glass-panel alert-item alert-${update.severity}`;
     alert.innerHTML = `<strong>${update.type.toUpperCase()}</strong>: ${update.message}`;
     feed.prepend(alert);
+  }
+
+  private updateUIState(state: RoutingStateValue) {
+    const statusText = document.getElementById('loader-status');
+    const reasoning = document.getElementById('ai-reasoning')!;
+    
+    switch (state) {
+      case RoutingState.IDLE:
+        if (statusText) statusText.innerText = 'Ready';
+        reasoning.style.display = 'none';
+        break;
+      case RoutingState.CALCULATING:
+        if (statusText) statusText.innerText = 'Calculating Tactical Route...';
+        reasoning.style.display = 'block';
+        reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
+        break;
+      case RoutingState.READY:
+        if (statusText) statusText.innerText = 'Tactical Route Established';
+        reasoning.style.display = 'block';
+        break;
+      case RoutingState.ERROR:
+        if (statusText) statusText.innerText = 'Routing Failed';
+        reasoning.style.display = 'block';
+        reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
+        break;
+    }
   }
 }
 

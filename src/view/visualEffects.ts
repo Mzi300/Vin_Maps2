@@ -18,10 +18,15 @@ export class VisualEffects {
   private destMarker: mapboxgl.Marker | null = null;
   private destination: [number, number] | null = null;
   private arrowOffset: number = 0;
-  public isFollowing: boolean = true;
+  private renderer: any;
 
-  constructor(map: any) {
+  constructor(map: any, renderer?: any) {
     this.map = map;
+    this.renderer = renderer;
+    
+    // Initialize 3D Vehicle Layer
+    this.threeVehicleLayer = new ThreeVehicleLayer(this.map);
+    this.map.addLayer(this.threeVehicleLayer);
   }
 
   /**
@@ -211,29 +216,10 @@ export class VisualEffects {
       this.animationId = null;
     }
 
-    this.isFollowing = true;
-    this.setupManualControlListeners();
-  }
-
-  private setupManualControlListeners() {
-    const unlock = () => {
-      if (this.isFollowing) {
-        this.isFollowing = false;
-        // Notify UI to show "Re-center" button
-        window.dispatchEvent(new CustomEvent('nav-camera-unlocked'));
-      }
-    };
-
-    this.map.on('dragstart', unlock);
-    this.map.on('wheel', unlock);
-    this.map.on('pitchstart', unlock);
-    this.map.on('rotatestart', unlock);
-    this.map.on('touchstart', unlock);
   }
 
   public recenter() {
-    this.isFollowing = true;
-    window.dispatchEvent(new CustomEvent('nav-camera-locked'));
+    // Logic moved to NavigationCameraController via MapRenderer
   }
 
   public startNavigationAnimation() {
@@ -242,35 +228,24 @@ export class VisualEffects {
   }
 
   public updateUserVehicle(coords: [number, number], heading: number) {
-    this.trafficPointCoords = coords;
-    
-    // Update Emoji Marker
-    if (!this.vehicleMarker) {
-      const el = document.createElement('div');
-      el.className = 'vehicle-emoji-marker';
-      el.style.fontSize = '38px';
-      el.style.filter = 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.8))';
-      el.innerText = this.transportEmoji;
-      
-      this.vehicleMarker = new mapboxgl.Marker({
-        element: el,
-        rotationAlignment: 'map',
-        pitchAlignment: 'map'
-      })
-      .setLngLat(coords)
-      .addTo(this.map);
-    } else {
-      this.vehicleMarker.setLngLat(coords);
-      this.vehicleMarker.setRotation(heading);
-      this.vehicleMarker.getElement().innerText = this.transportEmoji;
+    if (!this.map) return;
+
+    // 1. Handle 2D Marker (Hide it for premium 3D look)
+    if (this.vehicleMarker) {
+      this.vehicleMarker.getElement().style.display = 'none';
     }
-    
-    // Disable 3D layer if it exists to avoid overlap
-    try {
-      if (this.map.getLayer('3d-vehicle-layer')) {
-        this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'none');
+
+    // 2. Handle 3D Vehicle Layer
+    if (this.threeVehicleLayer) {
+      try {
+        if (this.map.getLayer('3d-vehicle-layer')) {
+          this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
+          this.threeVehicleLayer.updatePosition(coords, heading);
+        }
+      } catch (e) {
+        console.warn('[VisualEffects] Error updating 3D vehicle:', e);
       }
-    } catch(e) {}
+    }
 
     this.updateUserLocationGlow(coords);
   }
@@ -314,9 +289,15 @@ export class VisualEffects {
     // Dim the 3D buildings as well if using standard
     try {
       this.map.setConfigProperty('basemap', 'lightPreset', dim ? 'night' : 'dusk');
-      // Set building opacity to 0.4 for X-ray effect
-      this.map.setPaintProperty('building', 'fill-extrusion-opacity', dim ? 0.4 : 1.0);
-    } catch (e) {}
+      
+      // Mapbox Standard 3D buildings don't use 'building' ID
+      // If we are in a style that has it (e.g. Streets), update it.
+      if (this.map.getLayer('building')) {
+        this.map.setPaintProperty('building', 'fill-extrusion-opacity', dim ? 0.4 : 1.0);
+      }
+    } catch (e) {
+      console.warn('[VisualEffects] Could not dim buildings:', e);
+    }
   }
 
   private addDestinationMarker(coords: [number, number]) {
@@ -524,15 +505,9 @@ export class VisualEffects {
         this.threeVehicleLayer.updatePosition(this.trafficPointCoords, bearing);
       }
 
-      // Only follow if the user hasn't manually moved the map
-      if (this.isFollowing) {
-        this.map.setCenter(this.trafficPointCoords);
-        this.map.setBearing(bearing);
-        this.map.setPitch(75);
-        // Do NOT set zoom here to allow users to adjust zoom level while following
-        // Or we can set a default zoom but allow the user to change it.
-        // Google Maps usually keeps the zoom level you set.
-        if (this.map.getZoom() < 16) this.map.setZoom(18); 
+      // Update camera if in simulation/demo mode
+      if (this.renderer) {
+        this.renderer.updateCameraForNav(this.trafficPointCoords, bearing, 13.8); 
       }
 
       this.animationId = requestAnimationFrame(this.animateTraffic);

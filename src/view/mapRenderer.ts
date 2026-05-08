@@ -2,19 +2,15 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { intelligence } from '../engine/intelligenceManager';
 import { VisualEffects } from './visualEffects';
+import { NavigationCameraController, CameraMode } from './navigationCameraController';
 
 export class MapRenderer {
   private containerId: string;
   public map!: mapboxgl.Map;
   public visualEffects!: VisualEffects;
+  public cameraController!: NavigationCameraController;
   private animationId: number | null = null;
   private isNavigationMode: boolean = false;
-  private targetZoom: number = 18;
-  private currentZoom: number = 18;
-  private lastHeading: number = 0;
-  private currentHeading: number = 0;
-  private currentRoll: number = 0;
-  private currentCenter: [number, number] | null = null;
 
   constructor(containerId: string, token: string) {
     this.containerId = containerId;
@@ -45,7 +41,8 @@ export class MapRenderer {
     });
 
     this.map.on('style.load', () => {
-      this.visualEffects = new VisualEffects(this.map);
+      this.visualEffects = new VisualEffects(this.map, this);
+      this.cameraController = new NavigationCameraController(this.map);
 
       // 2. Cinematic lighting (dusk)
       this.map.setConfigProperty('basemap', 'lightPreset', 'dusk');
@@ -310,11 +307,9 @@ export class MapRenderer {
   }
 
   public resetCameraState(coords: [number, number], heading: number) {
-    this.currentCenter = coords;
-    this.currentHeading = heading;
-    this.lastHeading = heading;
-    this.currentZoom = 19;
-    this.currentRoll = 0;
+    if (this.cameraController) {
+      this.cameraController.update(coords, heading, 0);
+    }
   }
 
   /** --------------------------------------------------------------
@@ -330,21 +325,22 @@ export class MapRenderer {
   public enterNavigationMode() {
     this.isNavigationMode = true;
     this.stopRotation();
-    this.map.easeTo({
-      pitch: 60,
-      zoom: 18,
-      duration: 1000,
-      padding: { bottom: 200 }
-    });
+    if (this.cameraController) {
+      this.cameraController.setMode(CameraMode.DRIVING);
+    }
   }
 
   public exitNavigationMode() {
     this.isNavigationMode = false;
-    this.map.easeTo({
-      pitch: 0,
-      padding: { bottom: 0 },
-      duration: 1000
-    });
+    if (this.cameraController) {
+      this.cameraController.setMode(CameraMode.OVERVIEW);
+    }
+  }
+
+  public recenter() {
+    if (this.cameraController) {
+      this.cameraController.recenter();
+    }
   }
 
   /** --------------------------------------------------------------
@@ -354,82 +350,14 @@ export class MapRenderer {
     coords: [number, number],
     heading: number,
     speed: number,
-    minZoom: number = 15.5,
-    maxZoom: number = 19
-
+    _minZoom: number = 15.5,
+    _maxZoom: number = 19
   ) {
     if (!this.isNavigationMode) return;
 
-    // ---- 0. Heading‑lock stabilization (freeze when vehicle is near‑stationary) ----
-    const minHeadingSpeed = 0.5; // m/s
-    if (speed < minHeadingSpeed) {
-      heading = this.lastHeading;
-    } else {
-      this.lastHeading = heading;
+    if (this.cameraController) {
+      this.cameraController.update(coords, heading, speed);
     }
-
-    // ---- 1. Cinematic Heading Alignment (Interpolation) ----
-    // Calculate shortest path between current and target heading to avoid 360-flip
-    let targetHeading = heading;
-    let diff = targetHeading - this.currentHeading;
-    while (diff < -180) diff += 360;
-    while (diff > 180) diff -= 360;
-    
-    // Speed-based interpolation factor: slower/weightier at high speed
-    const lerpFactor = Math.min(0.08, 0.01 + (speed * 0.005)); 
-    this.currentHeading += diff * lerpFactor;
-
-
-    // ---- 2. Turn-based Cinematic Tilt (Roll simulation) ----
-    // Simulate a more dynamic camera tilt when turning at speed (GTA style)
-    const turnIntensity = diff * (speed / 8); // Slightly higher intensity
-    const targetRoll = Math.max(-15, Math.min(15, turnIntensity)); // Cap at +/- 15 degrees
-    this.currentRoll += (targetRoll - this.currentRoll) * 0.08;
-
-
-    // ---- 3. Dynamic zoom & pitch based on speed (GTA style pull-back) ----
-    // Lower pitch and pull back as speed increases
-    this.targetZoom = Math.max(minZoom, maxZoom - speed * 0.2);
-    const targetPitch = Math.max(50, 75 - speed * 1.5); 
-
-
-    // ---- 4. Predictive look‑ahead (forward offset with turn bias) ----
-    const lookAheadFactor = 2.5; // More aggressive look-ahead
-    const turnBias = diff * 0.2; // Shift camera slightly towards the turn
-    const offsetMeters = speed * lookAheadFactor;
-    const bearingRad = (this.currentHeading + turnBias) * Math.PI / 180;
-
-
-    const lat = coords[1];
-    const lng = coords[0];
-    const offsetLat = (offsetMeters * Math.sin(bearingRad)) / 110540;
-    const offsetLng = (offsetMeters * Math.cos(bearingRad)) / (111320 * Math.cos(lat * Math.PI / 180));
-
-    const lookAheadCenter: [number, number] = [lng + offsetLng, lat + offsetLat];
-
-    // ---- 5. Smooth interpolation for zoom, pitch, and center ----
-    this.currentZoom += (this.targetZoom - this.currentZoom) * 0.05;
-    const currentPitch = this.map.getPitch() + (targetPitch - this.map.getPitch()) * 0.05;
-    
-    if (!this.currentCenter) {
-      this.currentCenter = lookAheadCenter;
-    } else {
-      // Lerp center with speed-based damping (GTA feel)
-      const centerLerp = Math.min(0.15, 0.05 + (speed * 0.01));
-      this.currentCenter[0] += (lookAheadCenter[0] - this.currentCenter[0]) * centerLerp;
-      this.currentCenter[1] += (lookAheadCenter[1] - this.currentCenter[1]) * centerLerp;
-    }
-
-
-    // ---- 6. Apply the camera update ----
-    this.map.easeTo({
-      center: this.currentCenter,
-      bearing: this.currentHeading + this.currentRoll, // Add roll for turning tilt
-      zoom: this.currentZoom,
-      pitch: currentPitch,
-      duration: 0, 
-      easing: (t) => t
-    });
 
     // Update Visual Effects Guidance system if destination is set
     if (this.visualEffects && this.visualEffects.getDestination()) {
