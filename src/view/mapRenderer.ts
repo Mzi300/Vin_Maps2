@@ -281,8 +281,8 @@ export class MapRenderer {
     // 2. Immediate Focus: Fly to origin facing the correct direction
     this.map.flyTo({
       center: origin,
-      zoom: 21.8,
-      pitch: 78,
+      zoom: 22.2,
+      pitch: 82,
       bearing: initialBearing,
       duration: 800, // Faster transition
       essential: true
@@ -294,10 +294,10 @@ export class MapRenderer {
       
       this.map.easeTo({
         center: origin,
-        zoom: 21.8,
-        pitch: 78,
+        zoom: 22.2,
+        pitch: 82,
         bearing: initialBearing,
-        duration: 100 // Instant snap
+        duration: 50 // Near instant
       });
 
       this.map.once('moveend', () => {
