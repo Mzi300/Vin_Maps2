@@ -42,13 +42,13 @@ export class NavigationCameraController {
   // Configurable presets
   private presets: Record<CameraMode, any> = {
     [CameraMode.DRIVING]: {
-      pitch: 65, // Balanced tilt
-      zoom: 18.0, // Balanced "average" zoom
-      minPitch: 45,
-      maxPitch: 75,
-      minZoom: 15.5,
-      maxZoom: 19.5,
-      padding: { bottom: 200 }, // Balanced positioning
+      pitch: 68, // Optimal angle for 3D building faces
+      zoom: 19.2, // High-detail close-up zoom
+      minPitch: 50,
+      maxPitch: 80,
+      minZoom: 17.5, // Keep it close
+      maxZoom: 20.5,
+      padding: { bottom: 240 }, // Keep car low to show buildings ahead
       lerpPos: 0.1,
       lerpBearing: 0.08,
       lerpPitch: 0.05,
