@@ -42,17 +42,17 @@ export class NavigationCameraController {
   // Configurable presets
   private presets: Record<CameraMode, any> = {
     [CameraMode.DRIVING]: {
-      pitch: 72, // Aggressive windshield perspective
-      zoom: 20.2, // Extreme street-level zoom
-      minPitch: 55,
+      pitch: 78, // Horizon perspective
+      zoom: 21.8, // Absolute maximum street-level zoom
+      minPitch: 60,
       maxPitch: 85,
-      minZoom: 19.0, // Force it to stay close
-      maxZoom: 22.0,
-      padding: { bottom: 280 }, // Lower car for better building view
+      minZoom: 20.5, // Force it to stay extremely close
+      maxZoom: 22.5,
+      padding: { bottom: 320 }, // Lower car for maximum building presence
       lerpPos: 0.1,
       lerpBearing: 0.08,
-      lerpPitch: 0.05,
-      lerpZoom: 0.05,
+      lerpPitch: 0.1,
+      lerpZoom: 0.2, // Faster snap
       rollIntensity: 0.2,
       lookAhead: 2.5
     },
