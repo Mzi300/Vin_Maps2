@@ -69,8 +69,10 @@ export class ThreeVehicleLayer {
       metalness: 0.9,
       roughness: 0.1,
       emissive: 0x00f2ff,
-      emissiveIntensity: 2.5, // Even brighter
-      side: THREE.DoubleSide
+      emissiveIntensity: 2.5,
+      side: THREE.DoubleSide,
+      depthTest: false, // Ensure it's always on top of buildings
+      transparent: true
     });
 
     const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
@@ -82,7 +84,8 @@ export class ThreeVehicleLayer {
       color: 0x00f2ff,
       transparent: true,
       opacity: 0.4,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      depthTest: false // Always visible
     });
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     glow.rotation.x = Math.PI / 2;
