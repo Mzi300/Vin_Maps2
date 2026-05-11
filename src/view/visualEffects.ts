@@ -21,6 +21,9 @@ export class VisualEffects {
     // Initialize 3D Vehicle Layer
     this.threeVehicleLayer = new ThreeVehicleLayer(this.map);
     this.map.addLayer(this.threeVehicleLayer);
+    
+    // Ensure lastStableCoords is initialized so gating works on first move
+    this.lastStableCoords = [0, 0];
   }
 
   /**
@@ -233,7 +236,15 @@ export class VisualEffects {
     if (this.threeVehicleLayer) {
       try {
         if (this.map.getLayer('3d-vehicle-layer')) {
-          // Strict motion gating: only update if moving > 1.0m/s or moved > 2.5m
+          // First update should always show the vehicle
+          if (this.lastStableCoords[0] === 0) {
+            this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
+            this.threeVehicleLayer.updatePosition(coords, heading);
+            this.lastStableCoords = [...coords];
+            return;
+          }
+
+          // Strict motion gating: only update if moved > 2.5m
           const dist = this.calculateDistance(this.lastStableCoords, coords);
           if (dist > 2.5) { 
             this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');

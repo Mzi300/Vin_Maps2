@@ -46,15 +46,19 @@ export class ThreeVehicleLayer {
 
     const arrowGeometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      // Top Wing Left
-      0, 0, 1.8,    
-      -0.8, 0, -1.2, 
-      0, 0, -0.6,  
+      // Top Surface - Folded look
+      0, 0.4, 2,    // Tip
+      -1, 0, -1.5,  // Left Back
+      0, 0.2, -0.8, // Center Fold
       
-      // Top Wing Right
-      0, 0, 1.8,    
-      0, 0, -0.6,  
-      0.8, 0, -1.2, 
+      0, 0.4, 2,    // Tip
+      0, 0.2, -0.8, // Center Fold
+      1, 0, -1.5,   // Right Back
+
+      // Underside - to give it volume
+      -1, 0, -1.5,
+      1, 0, -1.5,
+      0, 0.2, -0.8
     ]);
 
     arrowGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
@@ -64,29 +68,29 @@ export class ThreeVehicleLayer {
       color: 0x00f2ff, 
       metalness: 0.9,
       roughness: 0.1,
-      emissive: 0x00a2ff,
-      emissiveIntensity: 1.5,
+      emissive: 0x00f2ff,
+      emissiveIntensity: 2.5, // Even brighter
       side: THREE.DoubleSide
     });
 
     const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
     group.add(arrow);
 
-    // Add a glowing core under the arrow
-    const glowGeometry = new THREE.CircleGeometry(0.8, 32);
+    // Add a glowing core under the arrow (Tactical Pulse)
+    const glowGeometry = new THREE.CircleGeometry(1.2, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: 0x00f2ff,
       transparent: true,
-      opacity: 0.3,
+      opacity: 0.4,
       side: THREE.DoubleSide
     });
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
     glow.rotation.x = Math.PI / 2;
-    glow.position.z = -0.2;
+    glow.position.z = -0.1;
     group.add(glow);
 
     // Scale up for visibility
-    group.scale.set(4, 4, 4);
+    group.scale.set(6, 6, 6);
     
     return group;
   }
