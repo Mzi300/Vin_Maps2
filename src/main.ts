@@ -206,8 +206,12 @@ class App {
       geoService.initializeLocation((coords) => {
         this.currentOriginCoords = coords;
         
-        // IMMEDIATE FLY: Move to user's real coordinates on launch
-        this.map.flyTo(coords[0], coords[1], 18.2); // Tighter zoom for street visibility
+        // SNAP TO GPS: Move to wherever the user is standing right now
+        this.map.map.jumpTo({
+          center: coords,
+          zoom: 18,
+          pitch: 68
+        });
         
         // Update camera controller with initial position
         if (this.map.cameraController) {
