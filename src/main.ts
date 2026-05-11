@@ -226,11 +226,8 @@ class App {
           (this.map.visualEffects as any).updateUserLocationGlow(coords);
         }
 
-        // 1. Start continuous tracking and enter follow mode by default
         this.navSystem.startTracking();
         this.map.enterNavigationMode();
-
-        // 2. Setup the global update listener early to track vehicle before routing
         this.setupNavigationStateListener();
 
         if (loader) {
@@ -251,502 +248,226 @@ class App {
     };
   }
 
-  private updateUIState(state: RoutingStateValue) {
-    const statusText = document.getElementById('loader-status');
-    const reasoning = document.getElementById('ai-reasoning');
-    const status = document.getElementById('route-title');
-    const eta = document.getElementById('route-eta');
-    const routeIdle = document.getElementById('route-idle');
-    const routeActive = document.getElementById('route-active');
-
-    switch (state) {
-      case RoutingState.IDLE:
-        if (statusText) statusText.innerText = 'Ready';
-        if (reasoning) reasoning.style.display = 'none';
-        if (routeIdle) routeIdle.style.display = 'block';
-        if (routeActive) routeActive.style.display = 'none';
-        if (status) status.innerText = 'SITREP: Johannesburg Sector';
-        if (eta) eta.innerText = 'Waiting for target coordinates...';
-        break;
-      case RoutingState.SEARCHING:
-        if (eta) eta.innerText = 'Synchronizing geocoding...';
-        break;
-      case RoutingState.CALCULATING:
-        if (statusText) statusText.innerText = 'Calculating Tactical Route...';
-        if (reasoning) {
-          reasoning.style.display = 'block';
-          reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
-        }
-        if (routeIdle) routeIdle.style.display = 'block';
-        if (routeActive) routeActive.style.display = 'none';
-        if (status) status.innerText = '[ CALCULATING ROUTE ]';
-        if (eta) eta.innerHTML = `<span style="color:var(--warning)">PROCESSING...</span>`;
-        break;
-      case RoutingState.READY:
-        if (statusText) statusText.innerText = 'Tactical Route Established';
-        if (reasoning) reasoning.style.display = 'block';
-        if (routeIdle) routeIdle.style.display = 'none';
-        if (routeActive) routeActive.style.display = 'none'; 
-        const infoReadout = document.getElementById('info-readout');
-        if (infoReadout) infoReadout.style.display = 'none'; 
-        const dropdown = document.querySelector('.dropdown-container');
-        if (dropdown) dropdown.classList.add('hidden');
-        const navBar = document.getElementById('nav-bottom-bar');
-        if (navBar) navBar.style.display = 'flex';
-        break;
-      case RoutingState.ERROR:
-        if (statusText) statusText.innerText = 'Routing Failed';
-        if (reasoning) {
-          reasoning.style.display = 'block';
-          reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
-        }
-        if (routeIdle) routeIdle.style.display = 'block';
-        if (routeActive) routeActive.style.display = 'none';
-        if (status) status.innerText = '[ ERROR ]';
-        if (eta) eta.innerHTML = `<span style="color:var(--danger)">FAILED</span>`;
-        break;
-    }
-  }
-
   private setupListeners() {
     const destInput = document.getElementById('dest-input') as HTMLInputElement;
     const originInput = document.getElementById('origin-input') as HTMLInputElement;
-    const lockBtn = document.getElementById('lock-dest');
-    const closeDirections = document.getElementById('close-directions');
-    const locateBtn = document.getElementById('locate-me');
-    const locateOriginBtn = document.getElementById('locate-origin');
+    const suggestionsList = document.getElementById('suggestions-list');
+    const originSuggestions = document.getElementById('origin-suggestions');
+
+    // Handle Search Inputs
+    destInput?.addEventListener('input', this.debounce(() => {
+      this.handleGeocoding(destInput.value, 'destination');
+    }, 300));
+
+    originInput?.addEventListener('input', this.debounce(() => {
+      this.handleGeocoding(originInput.value, 'origin');
+    }, 300));
+
+    // Handle Transportation Modes
+    document.querySelectorAll('.transport-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const type = (e.currentTarget as HTMLElement).dataset.type as TransportType;
+        this.currentTransportType = type;
+        
+        document.querySelectorAll('.transport-tab').forEach(t => t.classList.remove('active'));
+        (e.currentTarget as HTMLElement).classList.add('active');
+        
+        this.finalizeRouting(type);
+      });
+    });
+
+    // Sidebar
     const sidebar = document.getElementById('sidebar');
-
-    const debouncedGeocode = this.debounce((input: HTMLInputElement, listId: string) => {
-      const query = input.value;
-      if (query.length >= 1) {
-        this.updateUIState(RoutingState.SEARCHING);
-        this.fetchSuggestions(query, listId, input);
-      } else {
-        const list = document.getElementById(listId);
-        if (list) list.style.display = 'none';
-      }
-    }, 400);
-
-    destInput?.addEventListener('input', () => debouncedGeocode(destInput, 'suggestions-list'));
-    originInput?.addEventListener('input', () => debouncedGeocode(originInput, 'origin-suggestions'));
-
-    destInput?.addEventListener('keypress', (e) => { if (e.key === 'Enter') this.advanceToTransportStep(); });
-    lockBtn?.addEventListener('click', () => this.advanceToTransportStep());
-    closeDirections?.addEventListener('click', () => this.resetToSearch());
-    locateBtn?.addEventListener('click', () => this.acquireLocation('origin-input'));
     document.getElementById('open-sidebar')?.addEventListener('click', () => sidebar?.classList.add('open'));
     document.getElementById('close-sidebar')?.addEventListener('click', () => sidebar?.classList.remove('open'));
 
-    // Sidebar items functionality
     document.querySelectorAll('.sidebar-item').forEach(item => {
       item.addEventListener('click', (e) => {
         const text = (e.currentTarget as HTMLElement).innerText;
         sidebar?.classList.remove('open');
         
         if (text.includes('Saved Sectors')) {
-          this.map.flyTo(28.0473, -26.2041, 15); // Tactical HQ
+          this.map.flyTo(28.0473, -26.2041, 15);
           this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
         } else if (text.includes('Recent Missions')) {
           this.showTacticalNotification('LOADING MISSION ARCHIVES...');
-          setTimeout(() => this.showTacticalNotification('LAST MISSION: SANDTON SECTOR'), 1000);
-        } else if (text.includes('Contributions')) {
-          this.showTacticalNotification('INTEL REPORTED TO CENTRAL COMMAND');
-        } else if (text.includes('Your Timeline')) {
-          document.getElementById('summary-modal')!.style.display = 'block';
-        } else if (text.includes('Data in Maps')) {
-          const hasTraffic = this.map.map.getLayer('traffic');
-          if (hasTraffic) {
-            this.map.map.setLayoutProperty('traffic', 'visibility', 
-              this.map.map.getLayoutProperty('traffic', 'visibility') === 'visible' ? 'none' : 'visible'
-            );
-          }
-          this.showTacticalNotification('MAP DATA LAYERS TOGGLED');
-        } else if (text.includes('Share or Embed')) {
-          navigator.clipboard.writeText(window.location.href);
-          this.showTacticalNotification('TACTICAL LINK COPIED TO CLIPBOARD');
         }
       });
     });
 
-    document.getElementById('toggle-advanced')?.addEventListener('click', () => {
-      const panel = document.getElementById('advanced-details');
-      if (!panel) return;
-      const isHidden = panel.style.display === 'none';
-      panel.style.display = isHidden ? 'block' : 'none';
-      const toggleBtn = document.getElementById('toggle-advanced');
-      if (toggleBtn) toggleBtn.innerText = isHidden ? 'Advanced Tactical Data ▲' : 'Advanced Tactical Data ▼';
+    // Directions Toggle
+    document.getElementById('lock-dest')?.addEventListener('click', () => {
+      if (this.currentDestCoords) this.advanceToTransportStep();
     });
 
-    document.getElementById('exit-nav')?.addEventListener('click', () => {
-      this.resetToSearch();
+    document.getElementById('close-directions')?.addEventListener('click', () => {
+      document.getElementById('directions-view')!.style.display = 'none';
+      document.getElementById('search-view')!.style.display = 'flex';
+      this.map.exitNavigationMode();
     });
 
-    document.getElementById('recenter-btn')?.addEventListener('click', () => {
-      this.map.recenter();
+    // GPS Buttons
+    document.getElementById('locate-me')?.addEventListener('click', () => {
+      if (this.currentOriginCoords) {
+        this.map.flyTo(this.currentOriginCoords[0], this.currentOriginCoords[1]);
+        this.showTacticalNotification('RE-CENTERING ON OPERATOR COORDINATES');
+      }
     });
 
-    window.addEventListener('nav-camera-unlocked', () => {
-      const btn = document.getElementById('recenter-btn');
-      if (btn) btn.style.display = 'flex';
+    document.getElementById('locate-origin')?.addEventListener('click', () => {
+      if (this.currentOriginCoords) {
+        (document.getElementById('origin-input') as HTMLInputElement).value = 'Your Location';
+        this.handleGeocodingSelection('Your Location', this.currentOriginCoords, 'origin');
+      }
     });
 
-    window.addEventListener('nav-camera-locked', () => {
-      const btn = document.getElementById('recenter-btn');
-      if (btn) btn.style.display = 'none';
-    });
+    // Exit Nav
+    document.getElementById('exit-nav')?.addEventListener('click', () => this.stopNavigation());
 
+    // Recenter
+    document.getElementById('recenter-btn')?.addEventListener('click', () => this.map.recenter());
+
+    // Weather
     document.getElementById('weather-toggle')?.addEventListener('click', () => {
       if (this.map.visualEffects) this.map.visualEffects.toggleWeather();
     });
 
-    // Dropdown Logic
+    // POI Dropdown
     const dropdownToggle = document.getElementById('poi-dropdown-toggle');
     const dropdownMenu = document.getElementById('poi-dropdown-menu');
 
-    dropdownToggle?.addEventListener('click', (e) => {
-      e.stopPropagation();
-      dropdownMenu?.classList.toggle('active');
-      const arrow = dropdownToggle.querySelector('.arrow') as HTMLElement;
-      if (arrow) arrow.style.transform = dropdownMenu?.classList.contains('active') ? 'rotate(180deg)' : 'rotate(0deg)';
+    dropdownToggle?.addEventListener('click', () => {
+      dropdownMenu?.classList.toggle('show');
+      dropdownToggle.classList.toggle('active');
     });
 
-    document.addEventListener('click', () => {
-      dropdownMenu?.classList.remove('active');
-      const arrow = dropdownToggle?.querySelector('.arrow') as HTMLElement;
-      if (arrow) arrow.style.transform = 'rotate(0deg)';
-    });
-
-    document.querySelectorAll('.cat-btn').forEach(btn => {
+    document.querySelectorAll('[data-poi]').forEach(btn => {
       btn.addEventListener('click', (e) => {
-        const poi = (e.currentTarget as HTMLButtonElement).dataset.poi;
-        if (poi) {
-          this.filterUrbanIntelligence(poi);
-          dropdownMenu?.classList.remove('active');
-        }
+        const cat = (e.currentTarget as HTMLElement).dataset.poi!;
+        this.filterUrbanIntelligence(cat);
+        dropdownMenu?.classList.remove('show');
+        dropdownToggle?.classList.remove('active');
       });
-    });
-
-    document.getElementById('open-google-maps')?.addEventListener('click', () => {
-      const query = (document.getElementById('dest-input') as HTMLInputElement).value;
-      const url = query ? `https://www.google.com/maps/search/${encodeURIComponent(query)}` : `https://www.google.com/maps`;
-      window.open(url, '_blank');
-    });
-
-    document.querySelectorAll('.transport-tab').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        document.querySelectorAll('.transport-tab').forEach(b => b.classList.remove('active'));
-        (e.currentTarget as HTMLElement).classList.add('active');
-        const type = (e.currentTarget as HTMLElement).dataset.type as TransportType;
-        this.finalizeRouting(type);
-      });
-    });
-
-    intelligence.on('intelligence-update', (update: IntelligenceUpdate) => {
-      this.addAlertToFeed(update);
-    });
-
-    window.addEventListener('poi-intelligence', (e: any) => {
-      const { name, category, location } = e.detail;
-      this.handlePoiSelection(name, category, location);
     });
   }
 
-  private handlePoiSelection(name: string, category: string, location: [number, number]) {
-    this.currentDestCoords = location;
-    const status = document.getElementById('route-title')!;
-    const reasoning = document.getElementById('ai-reasoning')!;
-    const eta = document.getElementById('route-eta')!;
-
-    status.innerText = `URBAN INTEL: ${name.toUpperCase()}`;
-    eta.innerHTML = `<span class="glow-text" style="color:var(--primary-accent)">${category.toUpperCase()}</span> | NODE IDENTIFIED`;
+  private async handleGeocoding(query: string, mode: 'origin' | 'destination') {
+    if (!query || query.length < 2) return;
     
-    const brief = `Intelligence Briefing: ${name} is a designated ${category} within the sector. Strategic significance: Urban Infrastructure Node. Coordinates: ${location[0].toFixed(4)}, ${location[1].toFixed(4)}. Site is currently accessible.`;
-    
-    this.typeWriter(reasoning, brief);
-    this.speakBriefing(brief);
-    this.map.flyTo(location[0], location[1]);
-  }
-
-  private async fetchSuggestions(query: string, listId: string, inputEl: HTMLInputElement) {
     if (this.geocodingAbortController) this.geocodingAbortController.abort();
     this.geocodingAbortController = new AbortController();
 
-    const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${this.token}&country=za&limit=5`;
     try {
-      const resp = await fetch(url, { signal: this.geocodingAbortController.signal });
-      const data = await resp.json();
-      this.renderSuggestions(data.features, listId, inputEl);
-    } catch (err: any) {
-      if (err.name !== 'AbortError') console.error('Search failed:', err);
+      const proximity = this.currentOriginCoords ? `&proximity=${this.currentOriginCoords[0]},${this.currentOriginCoords[1]}` : '';
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${this.token}${proximity}&limit=5&country=ZA`;
+      
+      const res = await fetch(url, { signal: this.geocodingAbortController.signal });
+      const data = await res.json();
+      this.displaySuggestions(data.features, mode);
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') console.error('Geocoding fail:', e);
     }
   }
 
-  private renderSuggestions(features: any[], listId: string, inputEl: HTMLInputElement) {
-    const list = document.getElementById(listId)!;
-    if (features.length === 0) { list.style.display = 'none'; return; }
+  private displaySuggestions(features: any[], mode: 'origin' | 'destination') {
+    const list = mode === 'destination' ? document.getElementById('suggestions-list') : document.getElementById('origin-suggestions');
+    if (!list) return;
 
     list.innerHTML = features.map(f => `
-      <div class="suggestion-item" data-name="${f.text}" data-lng="${f.center[0]}" data-lat="${f.center[1]}">
-        <span class="sugg-icon">📍</span>
-        <div class="sugg-info"><div class="sugg-name">${f.text}</div><div class="sugg-sub">${f.place_name.split(',').slice(1).join(',')}</div></div>
+      <div class="suggestion-item" data-lng="${f.center[0]}" data-lat="${f.center[1]}" data-text="${f.text}">
+        <div class="sugg-main">${f.text}</div>
+        <div class="sugg-sub">${f.place_name}</div>
       </div>
     `).join('');
+    
+    list.style.display = features.length > 0 ? 'block' : 'none';
 
-    list.style.display = 'block';
     list.querySelectorAll('.suggestion-item').forEach(item => {
       item.addEventListener('click', (e) => {
-        const el = e.currentTarget as HTMLElement;
-        inputEl.value = el.dataset.name!;
-        if (el.dataset.lng && el.dataset.lat) {
-          const coords: [number, number] = [parseFloat(el.dataset.lng), parseFloat(el.dataset.lat)];
-          if (inputEl.id === 'dest-input') this.currentDestCoords = coords;
-          else this.currentOriginCoords = coords;
-        }
-        list.style.display = 'none';
-        if (inputEl.id === 'dest-input') this.advanceToTransportStep();
+        const target = e.currentTarget as HTMLElement;
+        const coords: [number, number] = [parseFloat(target.dataset.lng!), parseFloat(target.dataset.lat!)];
+        this.handleGeocodingSelection(target.dataset.text!, coords, mode);
       });
     });
   }
 
-  private async acquireLocation(targetId: string = 'origin-input') {
-    const reasoning = document.getElementById('ai-reasoning')!;
-    reasoning.innerText = "AI Assistant: Acquiring high-precision GPS lock...";
+  private handleGeocodingSelection(name: string, coords: [number, number], mode: 'origin' | 'destination') {
+    const inputId = mode === 'destination' ? 'dest-input' : 'origin-input';
+    const listId = mode === 'destination' ? 'suggestions-list' : 'origin-suggestions';
     
-    navigator.geolocation.getCurrentPosition(async (pos) => {
-      const { longitude, latitude } = pos.coords;
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${longitude},${latitude}.json?access_token=${this.token}&types=address`;
-      try {
-        const resp = await fetch(url);
-        const data = await resp.json();
-        const address = data.features[0]?.place_name || "Current Location";
-        const targetInput = document.getElementById(targetId) as HTMLInputElement;
-        if (targetInput) targetInput.value = address;
-        
-        const coords: [number, number] = [longitude, latitude];
-        if (targetId === 'dest-input') this.currentDestCoords = coords;
-        else this.currentOriginCoords = coords;
+    (document.getElementById(inputId) as HTMLInputElement).value = name;
+    document.getElementById(listId)!.style.display = 'none';
 
-        if (this.map.visualEffects) {
-          (this.map.visualEffects as any).updateUserLocationGlow(coords);
-        }
+    if (mode === 'origin') {
+      this.currentOriginCoords = coords;
+    } else {
+      this.currentDestCoords = coords;
+      document.getElementById('final-dest-display')!.setAttribute('value', name);
+      (document.getElementById('final-dest-display') as HTMLInputElement).value = name;
+      
+      const reasoning = document.getElementById('loader-status');
+      const address = name.split(',')[0];
+      if (reasoning) reasoning.innerText = `AI Assistant: Position acquired: ${address}.`;
+      this.map.flyTo(coords[0], coords[1]);
 
-        reasoning.innerText = `AI Assistant: Position acquired: ${address}.`;
-        this.map.flyTo(longitude, latitude);
-
-        // If we have both coords now, refresh the route line
-        if (this.currentOriginCoords && this.currentDestCoords) {
-          this.advanceToTransportStep();
-        }
-      } catch (e) { console.error('Reverse geocode failed', e); }
-    }, (err) => { reasoning.innerText = `AI Assistant: GPS acquisition failed: ${err.message}`; });
+      if (this.currentOriginCoords && this.currentDestCoords) {
+        this.advanceToTransportStep();
+      }
+    }
   }
 
   private advanceToTransportStep() {
-    const searchView = document.getElementById('search-view')!;
-    const directionsView = document.getElementById('directions-view')!;
-    const destInput = document.getElementById('dest-input') as HTMLInputElement;
-    const finalDestDisplay = document.getElementById('final-dest-display') as HTMLInputElement;
-
-    if (!destInput.value) return;
-
-    searchView.style.display = 'none';
-    directionsView.style.display = 'flex';
-    finalDestDisplay.value = destInput.value;
-
-    // Pre-fetch route in background without blocking UI
-    if (this.currentOriginCoords && this.currentDestCoords) {
-      if (this.routingAbortController) this.routingAbortController.abort();
-      this.routingAbortController = new AbortController();
-      
-      console.log('[App] Pre-fetching route...');
-      this.pendingRoutePromise = this.routeOptimizer.fetchAndOptimizeRoute(
-        this.currentOriginCoords, 
-        this.currentDestCoords, 
-        'driving',
-        this.routingAbortController.signal
-      ).catch(err => {
-        console.error('[App] Pre-fetch failed:', err);
-        return null;
-      }).then(async route => {
-        if (route) {
-          // Wait for map to be ready and visualEffects to be initialized
-          let attempts = 0;
-          while (!this.map.visualEffects && attempts < 20) {
-            await new Promise(r => setTimeout(r, 100));
-            attempts++;
-          }
-          
-          if (this.map.visualEffects) {
-            this.map.visualEffects.drawGlowingRoute(this.currentOriginCoords!, this.currentDestCoords!, route.coordinates);
-            this.map.flyTo(this.currentOriginCoords![0], this.currentOriginCoords![1]);
-          }
-        }
-        return route;
-      });
-    }
-  }
-
-  private resetToSearch() {
-    if (this.routingAbortController) this.routingAbortController.abort();
-    if (this.map.visualEffects) this.map.visualEffects.clearRoute();
+    document.getElementById('search-view')!.style.display = 'none';
+    document.getElementById('directions-view')!.style.display = 'flex';
     
-    const searchView = document.getElementById('search-view');
-    const directionsView = document.getElementById('directions-view');
-    const navBottomBar = document.getElementById('nav-bottom-bar');
-    const infoReadout = document.getElementById('info-readout');
-    const dropdown = document.querySelector('.dropdown-container');
-    const maneuverCard = document.getElementById('maneuver-card');
-    const hazardFab = document.getElementById('hazard-fab');
-
-    if (searchView) searchView.style.display = 'flex';
-    if (directionsView) directionsView.style.display = 'none';
-    if (navBottomBar) navBottomBar.style.display = 'none';
-    if (infoReadout) infoReadout.style.display = 'block';
-    if (dropdown) dropdown.classList.remove('hidden');
-    if (maneuverCard) maneuverCard.style.display = 'none';
-    if (hazardFab) hazardFab.style.display = 'none';
-
-    if (this.tripIsActive) this.showTripSummary();
-    this.tripIsActive = false;
-
-    this.updateUIState(RoutingState.IDLE);
-    
-    if (this.map.renderer) this.map.renderer.exitNavigationMode();
+    const firstTab = document.querySelector('.transport-tab') as HTMLElement;
+    if (firstTab) firstTab.click();
   }
 
   private async finalizeRouting(type: TransportType) {
-    this.currentTransportType = type;
-    if (this.map.visualEffects) {
-      this.map.visualEffects.setTransportMode(TRANSPORT_PROFILES[type].icon);
-    }
-    // const dest = (document.getElementById('final-dest-display') as HTMLInputElement).value;
-    
-    // 1. Critical GPS Auto-Lock: Fetch fresh accurate position before calculating route
-    const statusText = document.getElementById('loader-status');
-    if (statusText) statusText.innerText = 'Synchronizing GPS lock...';
-    
-    if (!this.currentOriginCoords) {
-      const geoService = new GeolocationService(this.map.map);
-      this.currentOriginCoords = await new Promise<[number, number]>((resolve) => {
-        const timeout = setTimeout(() => resolve([28.0163, -26.2307]), 3000);
-        geoService.initializeLocation((coords) => {
-          clearTimeout(timeout);
-          resolve(coords);
-        });
-      });
-    }
-    this.updateUIState(RoutingState.CALCULATING);
+    if (!this.currentOriginCoords || !this.currentDestCoords) return;
 
     if (this.routingAbortController) this.routingAbortController.abort();
     this.routingAbortController = new AbortController();
 
-    console.log('[App] Starting finalizeRouting for type:', type);
+    const profile = TRANSPORT_PROFILES[type].mapboxProfile;
     
-    let route: OptimizedRoute | null = null;
     try {
-      if (this.pendingRoutePromise) {
-        console.log('[App] Using pendingRoutePromise...');
-        route = await this.pendingRoutePromise;
-        this.pendingRoutePromise = null;
-      } else {
-        console.log('[App] Fetching new route...');
-        const profile = type === 'car' ? 'driving' : type === 'pedestrian' ? 'walking' : 'driving';
-        route = await this.routeOptimizer.fetchAndOptimizeRoute(
-          this.currentOriginCoords!, 
-          this.currentDestCoords!, 
-          profile,
-          this.routingAbortController.signal
-        );
+      const route = await this.routeOptimizer.fetchAndOptimizeRoute(
+        this.currentOriginCoords,
+        this.currentDestCoords,
+        profile,
+        this.routingAbortController.signal
+      );
+
+      if (route) {
+        this.map.executeCameraSequence(this.currentOriginCoords, this.currentDestCoords, route.coordinates);
+        this.startNavigation(route);
       }
-    } catch (err: any) {
-      console.error('[App] Routing error:', err);
-      if (err.name === 'AbortError') return;
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') console.error('Routing fail:', e);
     }
+  }
 
-    console.log('[App] Route received:', route ? 'SUCCESS' : 'NULL');
-
-    if (!route) {
-      this.updateUIState(RoutingState.ERROR);
-      return;
-    }
-
-    const { brief } = intelligence.generateTacticalBriefing(route, type);
-    const arrivalTime = new Date(Date.now() + route.duration * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
-    this.updateUIState(RoutingState.READY);
-    
-    // FORMAT DATA FOR CLEAN DISPLAY
-    // const distanceKm = Math.round(route.distance / 1000);
-    const totalMinutes = Math.floor(route.duration / 60);
-    const hours = Math.floor(totalMinutes / 60);
-    const mins = totalMinutes % 60;
-    const etaFormatted = hours > 0 ? `${hours}h ${mins}m` : `${mins}m`;
-
-    const etaTimeEl = document.getElementById('nav-eta-time');
-    const arrivalEl = document.getElementById('nav-arrival');
-    const distanceEl = document.getElementById('nav-distance');
-    
-    if (etaTimeEl) etaTimeEl.innerText = etaFormatted;
-    if (arrivalEl) arrivalEl.innerText = arrivalTime;
-    if (distanceEl) distanceEl.innerText = `${(route.distance / 1000).toFixed(1)} km`;
-    
-    // Debug: Update status in UI
-    const statusEl = document.getElementById('loader-status');
-    if (statusEl) statusEl.innerText = 'Route Active';
-
-    // Only speak the briefing, do not show narrative text in UI
-    this.speakBriefing(brief);
-    
-    // 2. Ensure vehicle is exactly at GPS start before transition
-    if (this.map.visualEffects && this.currentDestCoords) {
-      this.map.visualEffects.drawGlowingRoute(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
-    }
-
-    // 3. Smooth Camera Mode Transition: overview -> driver perspective
-    if (this.currentDestCoords) {
-      this.map.executeCameraSequence(this.currentOriginCoords!, this.currentDestCoords, route.coordinates);
-    }
-
-    // 4. Snap navigation system to exact starting coordinates (bypass smoothing)
-    let initialHeading = 0;
-    if (route.coordinates.length >= 2) {
-      const p1 = route.coordinates[0];
-      const p2 = route.coordinates[1];
-      initialHeading = (Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180) / Math.PI;
-    }
-    this.navSystem.snapToPosition(this.currentOriginCoords!, initialHeading);
-
-    // Setup Navigation System is handled by the global setupNavigationStateListener
-
-    // Auto-start Navigation Mode
-    if (this.map.enterNavigationMode) this.map.enterNavigationMode();
-    if (this.map.visualEffects) this.map.visualEffects.dimMapLayers(true);
-    
-    // Show Navigation UI
-    const dirView = document.getElementById('directions-view');
-    const navBar = document.getElementById('nav-bottom-bar');
-    const infoCard = document.getElementById('info-readout');
-    const dropdown = document.querySelector('.dropdown-container');
-
-    if (dirView) dirView.style.display = 'none';
-    if (navBar) navBar.style.display = 'flex';
-    if (infoCard) infoCard.style.display = 'none';
-    if (dropdown) dropdown.classList.add('hidden');
-
-    this.navSystem.start(route, type);
-    
-    // Initialize Trip Data
+  private startNavigation(route: OptimizedRoute) {
+    this.tripIsActive = true;
     this.tripStartTime = Date.now();
     this.tripTotalDistance = route.distance;
-    this.tripIsActive = true;
+    
+    this.navSystem.setRoute(route);
+    
+    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
+    document.getElementById('recenter-btn')!.style.display = 'flex';
+    document.getElementById('maneuver-card')!.style.display = 'flex';
+    
+    const briefing = intelligence.generateTacticalBriefing(route, this.currentTransportType);
+    this.showTacticalNotification(briefing.brief);
+    this.speakBriefing(briefing.brief);
     
     const hazardFab = document.getElementById('hazard-fab');
     if (hazardFab) hazardFab.style.display = 'flex';
     
-    // Hook into off-route detection
     this.navSystem.onOffRoute = () => {
-      console.log('[Navigation] Deviation detected. Re-routing...');
       this.speakBriefing("Recalculating route.");
       this.finalizeRouting(this.currentTransportType);
     };
@@ -761,6 +482,22 @@ class App {
       timestamp: Date.now()
     });
     this.speakBriefing(`Reporting ${type} at current location.`);
+  }
+
+  private stopNavigation() {
+    this.tripIsActive = false;
+    this.navSystem.stopTracking();
+    this.map.exitNavigationMode();
+    this.map.visualEffects.clearRoute();
+    
+    document.getElementById('nav-bottom-bar')!.style.display = 'none';
+    document.getElementById('recenter-btn')!.style.display = 'none';
+    document.getElementById('maneuver-card')!.style.display = 'none';
+    document.getElementById('hazard-fab')!.style.display = 'none';
+    document.getElementById('directions-view')!.style.display = 'none';
+    document.getElementById('search-view')!.style.display = 'flex';
+    
+    this.showTripSummary();
   }
 
   private showTripSummary() {
@@ -778,20 +515,25 @@ class App {
     document.getElementById('summary-modal')!.style.display = 'none';
   }
 
-
+  private speakBriefing(text: string) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.pitch = 0.85;
+      utterance.rate = 1.1;
+      window.speechSynthesis.speak(utterance);
+    }
+  }
 
   private setupNavigationStateListener() {
     this.navSystem.onUpdate = (state) => {
-      // Update camera follow mode
       const { min, max } = this.navSystem.getZoomRange();
       this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed, min, max);
 
-      // Update vehicle visually
       if (this.map.visualEffects) {
         this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
       }
 
-      // If a route is active, update the UI
       const navBottomBar = document.getElementById('nav-bottom-bar');
       if (navBottomBar && navBottomBar.style.display === 'flex') {
         const speedMs = state.speed > 1 ? state.speed : 13.8; 
@@ -802,14 +544,12 @@ class App {
         if (etaEl) etaEl.innerText = this.formatDuration(remainingSeconds);
         if (distEl) distEl.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
 
-        // Update Maneuver UI
         const card = document.getElementById('maneuver-card');
         if (card && state.isMoving) {
           card.style.display = 'flex';
           const maneuverDistEl = document.getElementById('maneuver-dist');
           if (maneuverDistEl) maneuverDistEl.innerText = `${Math.round(state.distanceToNext)} m`;
 
-          // Find current step from the active route
           const route = (this.navSystem as any).route; 
           if (route && route.steps) {
             const currentStep = route.steps[this.navSystem.currentStepIndex]; 
@@ -823,16 +563,6 @@ class App {
         }
       }
     };
-  }
-
-  private typeWriter(element: HTMLElement, text: string) {
-    element.innerText = '';
-    let i = 0;
-    const interval = setInterval(() => {
-      element.innerText += text.charAt(i);
-      i++;
-      if (i >= text.length) clearInterval(interval);
-    }, 20);
   }
 
   private getManeuverIcon(type: string): string {
@@ -854,13 +584,9 @@ class App {
     return '↑';
   }
 
-  /** --------------------------------------------------------------
-   *  STRATEGIC INTELLIGENCE: Filter POIs
-   *  -------------------------------------------------------------- */
   private async filterUrbanIntelligence(category: string) {
     const center = this.map.map.getCenter();
     
-    // Simulate tactical scanning
     const statusText = document.getElementById('loader-status');
     const startupLoader = document.getElementById('startup-loader');
     if (startupLoader && statusText) {
@@ -877,7 +603,18 @@ class App {
       const data = await response.json();
 
       if (data.features && data.features.length > 0) {
-        // Sort by distance from center
+        data.features.forEach((feature: any) => {
+          const [lng, lat] = feature.center;
+          this.map.addTacticalMarker({
+            id: feature.id,
+            type: category as any,
+            location: [lng, lat],
+            severity: 'info',
+            message: feature.text,
+            timestamp: Date.now()
+          });
+        });
+
         const sorted = data.features.map((f: any) => {
           const [lng, lat] = f.center;
           const dist = Math.sqrt(Math.pow(lng - center.lng, 2) + Math.pow(lat - center.lat, 2));
@@ -923,7 +660,6 @@ class App {
     if (hrs > 0) return `${hrs}h ${mins}m`;
     return `${mins} min`;
   }
-
 }
 
 new App();

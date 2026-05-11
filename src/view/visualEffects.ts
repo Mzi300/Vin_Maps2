@@ -15,20 +15,14 @@ export class VisualEffects {
   private destination: [number, number] | null = null;
   private arrowOffset: number = 0;
   private lastStableCoords: [number, number] = [0, 0];
-  private renderer: any;
 
-  constructor(map: any, renderer?: any) {
+  constructor(map: any) {
     this.map = map;
-    this.renderer = renderer;
     
     // Initialize 3D Vehicle Layer
     this.threeVehicleLayer = new ThreeVehicleLayer(this.map);
     this.map.addLayer(this.threeVehicleLayer);
   }
-
-  /**
-   * (Removed manual 3D Buildings logic as user requested return to Mapbox Standard style)
-   */
 
   /**
    * 2. Navigation Route Upgrade
@@ -147,32 +141,38 @@ export class VisualEffects {
         source: 'neon-route-source',
         layout: {
           'symbol-placement': 'line',
-          'symbol-spacing': 20,
-          'icon-image': 'circle-15',
-          'icon-size': 0.8,
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'icon-rotation-alignment': 'map'
+          'symbol-spacing': 80,
+          'icon-image': 'rocket-15',
+          'icon-size': 1.2,
+          'icon-rotate': 90,
+          'icon-rotation-alignment': 'map',
+          'icon-allow-overlap': true
         },
         paint: {
-          'icon-color': '#ffffff', // White chevrons
-          'icon-halo-color': '#4285F4',
-          'icon-halo-width': 1,
-          'icon-opacity': 0.8
+          'icon-opacity': 0.9,
+          'icon-color': '#ffffff'
         },
         slot: 'top'
       });
-
-      this.animateArrows();
     }
 
-    this.destination = destination;
+    // Add Destination Marker (Neon Pulse)
     this.addDestinationMarker(destination);
-    this.setVehicleAtStart();
   }
 
-  public getDestination(): [number, number] | null {
-    return this.destination;
+  private addDestinationMarker(coords: [number, number]) {
+    if (this.destMarker) this.destMarker.remove();
+
+    const el = document.createElement('div');
+    el.className = 'destination-pulse';
+    el.innerHTML = `
+      <div class="pulse-ring"></div>
+      <div class="pulse-center">🎯</div>
+    `;
+
+    this.destMarker = new mapboxgl.Marker(el)
+      .setLngLat(coords)
+      .addTo(this.map);
   }
 
   /**
@@ -238,238 +238,75 @@ export class VisualEffects {
           }
         }
       } catch (e) {
-        console.warn('[VisualEffects] Error updating 3D vehicle:', e);
+        console.warn("[VisualEffects] 3D Vehicle sync error:", e);
       }
     }
 
     this.updateUserLocationGlow(coords);
   }
 
-  public setTransportMode(emoji: string) {
-    if (this.vehicleMarker) {
-      this.vehicleMarker.getElement().innerText = emoji;
-    }
-  }
-
-  public updateUserLocationGlow(coords: [number, number]) {
-    if (!this.userLocationMarker) {
-      const el = document.createElement('div');
-      el.className = 'user-location-glow';
-      this.userLocationMarker = new mapboxgl.Marker({
-        element: el,
-        pitchAlignment: 'map',
-        rotationAlignment: 'map'
-      })
-        .setLngLat(coords)
-        .addTo(this.map);
-    } else {
-      this.userLocationMarker.setLngLat(coords);
-    }
-  }
-
-  public dimMapLayers(dim: boolean) {
-    const opacity = dim ? 0.3 : 1.0;
-    const layers = ['basemap', 'poi-label', 'transit-label'];
-    
-    layers.forEach(l => {
-      try {
-        if (this.map.getLayer(l)) {
-          this.map.setPaintProperty(l, 'icon-opacity', opacity);
-          this.map.setPaintProperty(l, 'text-opacity', opacity);
-        }
-      } catch (e) {}
-    });
-
-    // Dim the 3D buildings as well if using standard
-    try {
-      this.map.setConfigProperty('basemap', 'lightPreset', dim ? 'night' : 'dusk');
-      
-      // Mapbox Standard 3D buildings don't use 'building' ID
-      // If we are in a style that has it (e.g. Streets), update it.
-      if (this.map.getLayer('building')) {
-        this.map.setPaintProperty('building', 'fill-extrusion-opacity', dim ? 0.4 : 1.0);
-      }
-    } catch (e) {
-      console.warn('[VisualEffects] Could not dim buildings:', e);
-    }
-  }
-
-  private addDestinationMarker(coords: [number, number]) {
-    const el = document.createElement('div');
-    el.className = 'dest-beacon-container';
-    el.innerHTML = `
-      <div class="dest-beacon-beam"></div>
-      <div class="dest-beacon-flare"></div>
-      <div class="dest-label" style="position: absolute; bottom: 20px; white-space: nowrap; font-family: monospace; color: #00f2ff; text-shadow: 0 0 10px #00f2ff;">OBJECTIVE REACHED</div>
-    `;
-    
-    if (this.destMarker) this.destMarker.remove();
-    this.destMarker = new mapboxgl.Marker({
-      element: el,
-      anchor: 'bottom',
-      pitchAlignment: 'map',
-      rotationAlignment: 'map'
-    })
-      .setLngLat(coords)
-      .addTo(this.map);
-  }
-
-  /**
-   * 4. Guidance System
-   * Updates a directional beam/arrow from vehicle to destination
-   */
-  public updateGuidanceSystem(vehiclePos: [number, number], destPos: [number, number]) {
-    // 1. Update guidance beam source
-    const beamGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: {},
-          geometry: {
-            type: 'LineString',
-            coordinates: [vehiclePos, destPos]
-          }
-        }
-      ]
-    };
-
-    if (this.map.getSource('guidance-beam-source')) {
-      (this.map.getSource('guidance-beam-source') as GeoJSONSource).setData(beamGeoJSON);
-    } else {
-      this.map.addSource('guidance-beam-source', {
-        type: 'geojson',
-        data: beamGeoJSON
-      });
-
-      this.map.addLayer({
-        id: 'guidance-beam',
-        type: 'line',
-        source: 'guidance-beam-source',
-        paint: {
-          'line-color': '#00f2ff',
-          'line-width': 2,
-          'line-dasharray': [2, 2],
-          'line-opacity': 0.4
-        }
-      });
-
-      // Add a pulsing arrow/triangle pointing towards the destination
-      this.map.addLayer({
-        id: 'guidance-arrow',
-        type: 'symbol',
-        source: 'guidance-beam-source',
-        layout: {
-          'icon-image': 'triangle-15',
-          'icon-rotate': ['get', 'bearing'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true,
-          'icon-ignore-placement': true,
-          'symbol-placement': 'point'
-        },
-        paint: {
-          'icon-color': '#00f2ff',
-          'icon-halo-color': '#000',
-          'icon-halo-width': 1
-        }
-      });
-    }
-
-    // Update arrow bearing
-    const bearing = this.calculateBearing(vehiclePos, destPos);
-    const arrowGeoJSON: GeoJSON.FeatureCollection<GeoJSON.Geometry> = {
-      type: 'FeatureCollection',
-      features: [
-        {
-          type: 'Feature',
-          properties: { bearing: bearing },
-          geometry: {
-            type: 'Point',
-            coordinates: vehiclePos // Place arrow at vehicle position
-          }
-        }
-      ]
-    };
-    
-    // We need a separate source for the arrow if we want it to stay at the vehicle
-    if (this.map.getSource('guidance-arrow-source')) {
-      (this.map.getSource('guidance-arrow-source') as GeoJSONSource).setData(arrowGeoJSON);
-    } else {
-      this.map.addSource('guidance-arrow-source', {
-        type: 'geojson',
-        data: arrowGeoJSON
-      });
-
-      this.map.addLayer({
-        id: 'guidance-arrow-layer',
-        type: 'symbol',
-        source: 'guidance-arrow-source',
-        layout: {
-          'icon-image': 'triangle-11', // Standard Mapbox icon
-          'icon-size': 1.5,
-          'icon-rotate': ['get', 'bearing'],
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true
-        },
-        paint: {
-          'icon-color': '#00f2ff',
-          'icon-halo-color': '#000',
-          'icon-halo-width': 2,
-          'icon-opacity': 0.8
-        }
-      });
-    }
-
-    // 2. Distance-based scaling for destination marker
-    if (this.destMarker) {
-      const dist = this.calculateDistance(vehiclePos, destPos);
-      const el = this.destMarker.getElement();
-      
-      // Scaling: larger when far, smaller/precise when near
-      const scale = Math.min(2.0, Math.max(0.8, dist / 1000));
-      el.style.transform = `scale(${scale})`;
-      
-      // Opacity: pulse faster if close? (Optional)
-    }
-  }
-
   private calculateDistance(p1: [number, number], p2: [number, number]): number {
-    const R = 6371e3; // meters
-    const φ1 = p1[1] * Math.PI / 180;
-    const φ2 = p2[1] * Math.PI / 180;
-    const Δφ = (p2[1] - p1[1]) * Math.PI / 180;
-    const Δλ = (p2[0] - p1[0]) * Math.PI / 180;
+    const R = 6371e3; // metres
+    const φ1 = p1[1] * Math.PI/180;
+    const φ2 = p2[1] * Math.PI/180;
+    const Δφ = (p2[1]-p1[1]) * Math.PI/180;
+    const Δλ = (p2[0]-p1[0]) * Math.PI/180;
 
-    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
               Math.cos(φ1) * Math.cos(φ2) *
-              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+              Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 
     return R * c;
   }
 
-  private calculateBearing(start: [number, number], end: [number, number]): number {
-    const dx = end[0] - start[0];
-    const dy = end[1] - start[1];
-    return (Math.atan2(dx, dy) * 180) / Math.PI;
+  public updateUserLocationGlow(coords: [number, number]) {
+    if (this.userLocationMarker) this.userLocationMarker.remove();
+
+    const el = document.createElement('div');
+    el.className = 'user-location-glow';
+    el.innerHTML = '<div class="glow-core"></div><div class="glow-pulse"></div>';
+
+    this.userLocationMarker = new mapboxgl.Marker(el)
+      .setLngLat(coords)
+      .addTo(this.map);
   }
 
   public clearRoute() {
-    if (this.animationId) cancelAnimationFrame(this.animationId);
-    if (this.destMarker) this.destMarker.remove();
-    
-    // Remove layers FIRST in reverse order of dependency
-    if (this.map.getLayer('neon-route-arrows')) this.map.removeLayer('neon-route-arrows');
-    if (this.map.getLayer('neon-route-core')) this.map.removeLayer('neon-route-core');
     if (this.map.getLayer('neon-route-glow')) this.map.removeLayer('neon-route-glow');
-    
-    // Remove source LAST
+    if (this.map.getLayer('neon-route-core')) this.map.removeLayer('neon-route-core');
+    if (this.map.getLayer('neon-route-arrows')) this.map.removeLayer('neon-route-arrows');
+    if (this.map.getLayer('neon-route-symbols')) this.map.removeLayer('neon-route-symbols');
     if (this.map.getSource('neon-route-source')) this.map.removeSource('neon-route-source');
+    if (this.destMarker) this.destMarker.remove();
+    this.destMarker = null;
   }
 
+  public setPoiFilter(category: string | null) {
+    // Category mapping for Mapbox Standard layers
+    const layerMapping: Record<string, string[]> = {
+      hospital: ['medical-label', 'hospital-label'],
+      police: ['police-label', 'security-label'],
+      bank: ['bank-label', 'atm-label', 'financial-label'],
+      fuel: ['gas-label', 'fuel-station-label'],
+      hotel: ['hotel-label', 'lodging-label']
+    };
 
-
-
+    const targetLayers = category ? layerMapping[category] || [] : [];
+    
+    // Highlight relevant labels using tactical neon styles
+    this.map.getStyle().layers.forEach(layer => {
+      if (layer.type === 'symbol') {
+        const isMatch = targetLayers.some(tl => layer.id.includes(tl));
+        
+        try {
+          this.map.setPaintProperty(layer.id, 'text-color', isMatch ? '#00f2ff' : '#ffffff');
+          this.map.setPaintProperty(layer.id, 'text-halo-color', isMatch ? 'rgba(0, 242, 255, 0.4)' : 'rgba(0,0,0,0.8)');
+          this.map.setPaintProperty(layer.id, 'text-halo-width', isMatch ? 4 : 1);
+        } catch (e) {}
+      }
+    });
+  }
 
   /**
    * 4. Weather & Atmosphere Integration

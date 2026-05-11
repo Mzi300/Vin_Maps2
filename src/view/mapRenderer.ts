@@ -9,7 +9,6 @@ export class MapRenderer {
   public map!: mapboxgl.Map;
   public visualEffects!: VisualEffects;
   public cameraController!: NavigationCameraController;
-  private animationId: number | null = null;
   private isNavigationMode: boolean = false;
 
   constructor(containerId: string, token: string) {
@@ -41,7 +40,7 @@ export class MapRenderer {
     });
 
     this.map.on('style.load', () => {
-      this.visualEffects = new VisualEffects(this.map, this);
+      this.visualEffects = new VisualEffects(this.map);
       this.cameraController = new NavigationCameraController(this.map);
 
       // 2. Cinematic lighting (dusk)
@@ -70,8 +69,6 @@ export class MapRenderer {
     });
 
     this.map.on('load', () => {
-      // this.startRotation();
-
       // Cancel rotation on user interaction
       this.map.on('mousedown', () => {
         if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
@@ -225,7 +222,6 @@ export class MapRenderer {
    *  Camera flight helpers
    *  -------------------------------------------------------------- */
   public flyTo(lng: number, lat: number, zoom: number = 18.5) {
-
     // Locked
     this.map.flyTo({
       center: [lng, lat],
@@ -245,8 +241,6 @@ export class MapRenderer {
     destination: [number, number],
     routeCoords?: [number, number][]
   ) {
-
-
     if (this.visualEffects) {
       this.visualEffects.drawGlowingRoute(origin, destination, routeCoords);
     }
@@ -266,9 +260,6 @@ export class MapRenderer {
       initialBearing = (Math.atan2(next[0] - start[0], next[1] - start[1]) * 180) / Math.PI;
     }
 
-    // Locked
-
-    
     // 2. Immediate Focus: Fly to origin facing the correct direction
     this.map.flyTo({
       center: origin,
@@ -290,11 +281,6 @@ export class MapRenderer {
         bearing: initialBearing,
         duration: 50 // Near instant
       });
-
-      // No auto-simulation during live nav
-      // this.map.once('moveend', () => {
-      //   if (this.visualEffects) this.visualEffects.startNavigationAnimation();
-      // });
     });
   }
 
@@ -316,7 +302,6 @@ export class MapRenderer {
    *  -------------------------------------------------------------- */
   public enterNavigationMode() {
     this.isNavigationMode = true;
-
     if (this.cameraController) {
       this.cameraController.setMode(CameraMode.DRIVING);
     }
