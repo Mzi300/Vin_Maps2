@@ -427,6 +427,17 @@ class App {
       );
 
       if (route) {
+        // PRE-INIT HUD: Show data before motion starts
+        const etaEl = document.getElementById('nav-eta-time');
+        const distEl = document.getElementById('nav-distance');
+        const arrivalEl = document.getElementById('nav-arrival');
+        if (etaEl) etaEl.innerText = this.formatDuration(route.duration);
+        if (distEl) distEl.innerText = `${(route.distance / 1000).toFixed(1)} km`;
+        if (arrivalEl) {
+          const arrivalTime = new Date(Date.now() + route.duration * 1000);
+          arrivalEl.innerText = arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
         this.map.executeCameraSequence(this.currentOriginCoords, this.currentDestCoords, route.coordinates);
         this.startNavigation(route);
       }
@@ -444,6 +455,10 @@ class App {
     document.getElementById('nav-bottom-bar')!.style.display = 'flex';
     document.getElementById('recenter-btn')!.style.display = 'flex';
     document.getElementById('maneuver-card')!.style.display = 'flex';
+    
+    // Ensure Intel dropdown remains accessible
+    const intelDropdown = document.querySelector('.dropdown-container') as HTMLElement;
+    if (intelDropdown) intelDropdown.style.display = 'flex';
     
     const briefing = intelligence.generateTacticalBriefing(route, this.currentTransportType);
     this.showTacticalNotification(briefing.brief);
