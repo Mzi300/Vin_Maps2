@@ -44,44 +44,46 @@ export class ThreeVehicleLayer {
   private createNavigationArrow(): THREE.Group {
     const group = new THREE.Group();
 
-    // Create a custom geometry for the "folded" arrow look
-    const geometry = new THREE.BufferGeometry();
-    
-    // Vertices for a 3D folded arrow (Paper plane style)
-    // Tip is at (0, 0, 1), center fold is raised
+    const arrowGeometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      // Left Wing
-      0, 0.6, 2,    // 0: Tip (Top)
-      -1.2, 0, -1.5, // 1: Left Back
-      0, 0.2, -0.8,  // 2: Bottom Indent (Top)
+      // Top Wing Left
+      0, 0, 1.8,    
+      -0.8, 0, -1.2, 
+      0, 0, -0.6,  
       
-      // Right Wing
-      0, 0.6, 2,    // 3: Tip (Top)
-      0, 0.2, -0.8,  // 4: Bottom Indent (Top)
-      1.2, 0, -1.5,  // 5: Right Back
-
-      // Underside (to give it volume)
-      -1.2, 0, -1.5,
-      1.2, 0, -1.5,
-      0, 0.2, -0.8
+      // Top Wing Right
+      0, 0, 1.8,    
+      0, 0, -0.6,  
+      0.8, 0, -1.2, 
     ]);
 
-    geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
-    geometry.computeVertexNormals();
+    arrowGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+    arrowGeometry.computeVertexNormals();
 
-    const material = new THREE.MeshStandardMaterial({ 
-      color: 0xff0000, 
-      metalness: 0.8,
-      roughness: 0.2,
-      emissive: 0xaa0000,
-      emissiveIntensity: 0.3,
-      depthTest: true, // Re-enable for correct ground placement
-      transparent: true,
+    const arrowMaterial = new THREE.MeshStandardMaterial({ 
+      color: 0x00f2ff, 
+      metalness: 0.9,
+      roughness: 0.1,
+      emissive: 0x00a2ff,
+      emissiveIntensity: 1.5,
       side: THREE.DoubleSide
     });
 
-    const arrow = new THREE.Mesh(geometry, material);
+    const arrow = new THREE.Mesh(arrowGeometry, arrowMaterial);
     group.add(arrow);
+
+    // Add a glowing core under the arrow
+    const glowGeometry = new THREE.CircleGeometry(0.8, 32);
+    const glowMaterial = new THREE.MeshBasicMaterial({
+      color: 0x00f2ff,
+      transparent: true,
+      opacity: 0.3,
+      side: THREE.DoubleSide
+    });
+    const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+    glow.rotation.x = Math.PI / 2;
+    glow.position.z = -0.2;
+    group.add(glow);
 
     // Scale up for visibility
     group.scale.set(4, 4, 4);
