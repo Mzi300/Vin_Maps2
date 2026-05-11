@@ -15,7 +15,6 @@ export class NavigationSystem {
   private watchId: number | null = null;
   private lastPosition: [number, number] | null = null;
   private lastTime: number = 0;
-  private lastSpeed: number = 0;
   
   // Dynamic parameters based on profile
   private speedThreshold: number = 3.0; // meters per second (higher to avoid jitter)
@@ -88,7 +87,6 @@ export class NavigationSystem {
 
   private speedRollingAverage: number[] = [];
   private readonly MAX_SPEED_SAMPLES = 5;
-  private readonly MIN_MOVEMENT_THRESHOLD = 2.0; // meters
 
   private handlePositionUpdate(pos: GeolocationPosition) {
     const { longitude, latitude, accuracy } = pos.coords;

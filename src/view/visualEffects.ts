@@ -12,7 +12,6 @@ export class VisualEffects {
   private threeVehicleLayer!: ThreeVehicleLayer;
   private userLocationMarker: mapboxgl.Marker | null = null;
   private destMarker: mapboxgl.Marker | null = null;
-  private destination: [number, number] | null = null;
   private arrowOffset: number = 0;
   private lastStableCoords: [number, number] = [0, 0];
 
