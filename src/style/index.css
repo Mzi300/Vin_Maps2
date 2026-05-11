@@ -1343,25 +1343,26 @@ body {
 
 .maneuver-card {
   position: absolute;
-  top: 1.5rem;   /* Safe margin from top */
-  left: 1.5rem;  /* Safe margin from left */
-  width: 300px;  /* Slightly wider for text */
+  top: 1.5rem;
+  left: 1.5rem;
+  width: 360px; /* Increased width */
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  z-index: 9999; /* HIGHEST Z-INDEX to ensure visibility */
-  border-radius: 12px;
-  background: rgba(10, 10, 10, 0.95); /* Opaque for readability */
-  border: 1px solid var(--primary-accent); /* Lime border for pop */
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  gap: 1.5rem;
+  padding: 1.2rem 2rem; /* Increased padding */
+  z-index: 10000; /* Absolute highest */
+  border-radius: 16px;
+  background: rgba(10, 10, 10, 0.98);
+  border: 2px solid var(--primary-accent);
+  box-shadow: 0 0 30px rgba(0, 242, 255, 0.4);
   pointer-events: auto;
 }
 
 .maneuver-icon {
-  font-size: 1.8rem; /* Reduced size */
+  font-size: 2.5rem; /* Larger icon */
   font-weight: 900;
   color: var(--primary-accent);
+  text-shadow: 0 0 10px var(--primary-accent);
 }
 
 .maneuver-text {
@@ -1370,11 +1371,11 @@ body {
 }
 
 .instruction-main {
-  font-size: 1rem; /* Reduced size */
-  font-weight: 800;
+  font-size: 1.3rem; /* Larger text */
+  font-weight: 900;
   text-transform: uppercase;
   color: #fff;
-  line-height: 1.2;
+  line-height: 1.1;
 }
 
 .instruction-sub {
