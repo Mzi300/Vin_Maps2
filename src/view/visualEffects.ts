@@ -250,6 +250,9 @@ export class VisualEffects {
             this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
             this.threeVehicleLayer.updatePosition(coords, heading);
             this.lastStableCoords = [...coords];
+            
+            // Periodically force to top to prevent building occlusion
+            this.map.moveLayer('3d-vehicle-layer');
           }
         }
       } catch (e) {
