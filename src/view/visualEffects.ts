@@ -86,7 +86,7 @@ export class VisualEffects {
         },
         paint: {
           'line-color': '#32CD32', // Ultra-bright Lime
-          'line-width': 10,        // Sharp core
+          'line-width': 22,        // Wider core to cover lane width
           'line-opacity': 1,
           'line-blur': 0
         },
@@ -98,7 +98,7 @@ export class VisualEffects {
       } catch (e) {}
 
 
-      // Outer glow layer (Tactical Neon Flare)
+      // Outer glow layer (Tactical Neon Flare) - Wider to cover road
       this.map.addLayer({
         id: 'neon-route-glow',
         type: 'line',
@@ -109,9 +109,9 @@ export class VisualEffects {
         },
         paint: {
           'line-color': '#32CD32', // Lime Glow
-          'line-width': 22,        // Wide flare
-          'line-blur': 12,         // High-res soft blur
-          'line-opacity': 0.4
+          'line-width': 45,        // Much wider flare
+          'line-blur': 15,         // Soft edges for realism
+          'line-opacity': 0.35
         },
         slot: 'top'
       }, 'neon-route-core');
