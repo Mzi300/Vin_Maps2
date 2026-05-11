@@ -1344,25 +1344,26 @@ body {
 .maneuver-card {
   position: absolute;
   top: 1.5rem;
-  right: 1.5rem; /* Switched back to Top-Right */
-  width: 360px;
+  right: 1.5rem;
+  width: auto; /* Auto width like a pill */
+  min-width: 180px;
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 1.2rem 2rem;
+  gap: 0.8rem;
+  padding: 0.5rem 1.2rem; /* Compact padding like cat-btn */
   z-index: 10000;
-  border-radius: 16px;
-  background: rgba(10, 10, 10, 0.98);
-  border: 2px solid var(--primary-accent);
-  box-shadow: 0 0 30px rgba(0, 242, 255, 0.4);
+  border-radius: 20px; /* Pill shape like cat-btn */
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   pointer-events: auto;
 }
 
 .maneuver-icon {
-  font-size: 2.5rem; /* Larger icon */
+  font-size: 1.2rem; /* Matches cat-btn icon scale */
   font-weight: 900;
   color: var(--primary-accent);
-  text-shadow: 0 0 10px var(--primary-accent);
 }
 
 .maneuver-text {
@@ -1371,11 +1372,11 @@ body {
 }
 
 .instruction-main {
-  font-size: 1.3rem; /* Larger text */
-  font-weight: 900;
+  font-size: 0.8rem; /* Matches cat-btn font size */
+  font-weight: 800;
   text-transform: uppercase;
   color: #fff;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .instruction-sub {
