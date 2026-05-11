@@ -86,7 +86,7 @@ export class VisualEffects {
         },
         paint: {
           'line-color': '#32CD32', // Ultra-bright Lime
-          'line-width': 35,        // Massive core width
+          'line-width': 14,        // Elegant high-res width
           'line-opacity': 1.0,
           'line-blur': 0
         },
@@ -109,9 +109,9 @@ export class VisualEffects {
         },
         paint: {
           'line-color': '#32CD32', // Lime Glow
-          'line-width': 70,        // Massive glow flare
-          'line-blur': 25,         // Deep blur for soft light effect
-          'line-opacity': 0.6      // High glow intensity
+          'line-width': 25,        // Elegant glow flare
+          'line-blur': 8,          // Tighter blur
+          'line-opacity': 0.4      // Balanced glow
         },
         slot: 'top'
       }, 'neon-route-core');
