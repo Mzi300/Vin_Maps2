@@ -873,9 +873,10 @@ class App {
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${category}.json?proximity=${center.lng},${center.lat}&access_token=${this.token}&limit=12`
-      });
+      );
+      const data = await response.json();
 
-      if (data.features.length > 0) {
+      if (data.features && data.features.length > 0) {
         // Sort by distance from center
         const sorted = data.features.map((f: any) => {
           const [lng, lat] = f.center;
