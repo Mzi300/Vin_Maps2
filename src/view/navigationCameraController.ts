@@ -49,8 +49,8 @@ export class NavigationCameraController {
       minZoom: 15.0,
       maxZoom: 18.5,
       padding: { bottom: 180 }, // Adjusted offset for tighter zoom
-      lerpPos: 0.08, 
-      lerpBearing: 0.05, 
+      lerpPos: 0.15,      // Snappier tracking
+      lerpBearing: 0.12,  // Snappier rotation
       lerpPitch: 0.06,
       lerpZoom: 0.06,
       rollIntensity: 0.4,
@@ -153,7 +153,7 @@ export class NavigationCameraController {
     this.extrapolationTime = 0;
 
     // Handle stationary/low-speed jitter
-    const minHeadingSpeed = 1.0; // m/s
+    const minHeadingSpeed = 0.5; // Lowered from 1.0 for earlier rotation tracking
     if (speed >= minHeadingSpeed || force) {
       this.target.bearing = heading;
     }
