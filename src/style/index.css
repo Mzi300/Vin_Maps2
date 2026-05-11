@@ -1344,13 +1344,13 @@ body {
 .maneuver-card {
   position: absolute;
   top: 1.5rem;
-  left: 1.5rem;
-  width: 360px; /* Increased width */
+  right: 1.5rem; /* Switched back to Top-Right */
+  width: 360px;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  padding: 1.2rem 2rem; /* Increased padding */
-  z-index: 10000; /* Absolute highest */
+  padding: 1.2rem 2rem;
+  z-index: 10000;
   border-radius: 16px;
   background: rgba(10, 10, 10, 0.98);
   border: 2px solid var(--primary-accent);
