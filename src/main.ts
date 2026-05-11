@@ -1,6 +1,5 @@
 import { MapRenderer } from './view/mapRenderer';
 import { intelligence } from './engine/intelligenceManager';
-import type { IntelligenceUpdate } from './engine/intelligenceManager';
 import { TRANSPORT_PROFILES } from './data/transportModes';
 import type { TransportType } from './data/transportModes';
 import { GeolocationService } from './engine/geolocationService';
@@ -19,28 +18,16 @@ window.addEventListener('error', (e) => {
   }
 });
 
-const RoutingState = {
-  IDLE: 'IDLE',
-  SEARCHING: 'SEARCHING',
-  CALCULATING: 'CALCULATING',
-  READY: 'READY',
-  ERROR: 'ERROR'
-} as const;
-
-type RoutingStateValue = typeof RoutingState[keyof typeof RoutingState];
-
 class App {
   private map!: MapRenderer;
   private token: string | null = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibXppa2F5aXNlMDEiLCJhIjoiY21vczd4ajc4MDA5ODJ3c2R3NDV2dHI0NSJ9.gbvq-aQiEttYKka8u4qmqg';
   private routeOptimizer!: RouteOptimizer;
   private currentOriginCoords: [number, number] | null = null;
   private currentDestCoords: [number, number] | null = null;
-  private pendingRoutePromise: Promise<OptimizedRoute | null> | null = null;
   private navSystem!: NavigationSystem;
   private currentTransportType: TransportType = 'car';
   private tripStartTime: number = 0;
   private tripTotalDistance: number = 0;
-  private tripIsActive: boolean = false;
   private geocodingAbortController: AbortController | null = null;
   private routingAbortController: AbortController | null = null;
 
@@ -150,8 +137,6 @@ class App {
                 </div>
               </div>
 
-              <div id="info-readout" style="display: none;"></div>
-
               <div id="nav-bottom-bar" class="gta-hud-pill nav-bar-minimal" style="display: none;">
                 <div class="nav-info-group">
                   <span id="nav-eta-time" class="nav-main-eta">--</span>
@@ -251,8 +236,6 @@ class App {
   private setupListeners() {
     const destInput = document.getElementById('dest-input') as HTMLInputElement;
     const originInput = document.getElementById('origin-input') as HTMLInputElement;
-    const suggestionsList = document.getElementById('suggestions-list');
-    const originSuggestions = document.getElementById('origin-suggestions');
 
     // Handle Search Inputs
     destInput?.addEventListener('input', this.debounce(() => {
@@ -450,11 +433,10 @@ class App {
   }
 
   private startNavigation(route: OptimizedRoute) {
-    this.tripIsActive = true;
     this.tripStartTime = Date.now();
     this.tripTotalDistance = route.distance;
     
-    this.navSystem.setRoute(route);
+    this.navSystem.start(route, TRANSPORT_PROFILES[this.currentTransportType].mapboxProfile);
     
     document.getElementById('nav-bottom-bar')!.style.display = 'flex';
     document.getElementById('recenter-btn')!.style.display = 'flex';
@@ -485,8 +467,7 @@ class App {
   }
 
   private stopNavigation() {
-    this.tripIsActive = false;
-    this.navSystem.stopTracking();
+    this.navSystem.stop();
     this.map.exitNavigationMode();
     this.map.visualEffects.clearRoute();
     
