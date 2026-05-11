@@ -778,40 +778,7 @@ class App {
     document.getElementById('summary-modal')!.style.display = 'none';
   }
 
-  private getManeuverIcon(type: string): string {
-    switch (type) {
-      case 'turn': return '⤴';
-      case 'continue': return '↑';
-      case 'merge': return 'Merge';
-      case 'depart': return '🏁';
-      case 'arrive': return '📍';
-      default: return '↑';
-    }
-  }
 
-  private formatDuration(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const hours = Math.floor(mins / 60);
-    return hours > 0 ? `${hours}h ${mins % 60}m` : `${mins}m`;
-  }
-
-  private speakBriefing(text: string) {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.pitch = 0.85;
-      utterance.rate = 1.1;
-      window.speechSynthesis.speak(utterance);
-    }
-  }
-
-  private filterUrbanIntelligence(category: string) {
-    const reasoning = document.getElementById('ai-reasoning')!;
-    document.getElementById('route-title')!.innerText = `[ FILTERING: ${category.toUpperCase()} ]`;
-    reasoning.innerText = `AI Assistant: Highlighting all ${category} nodes. Monitoring availability...`;
-    
-    this.map.setPoiFilter(category);
-  }
 
   private setupNavigationStateListener() {
     this.navSystem.onUpdate = (state) => {
@@ -906,19 +873,6 @@ class App {
     try {
       const response = await fetch(
         `https://api.mapbox.com/geocoding/v5/mapbox.places/${category}.json?proximity=${center.lng},${center.lat}&access_token=${this.token}&limit=12`
-      );
-      const data = await response.json();
-
-      data.features.forEach((feature: any) => {
-        const [lng, lat] = feature.center;
-        this.map.addTacticalMarker({
-          id: feature.id,
-          type: category as any,
-          location: [lng, lat],
-          severity: 'info',
-          message: feature.text, // Updated to match interface
-          timestamp: Date.now()
-        });
       });
 
       if (data.features.length > 0) {

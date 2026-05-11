@@ -74,15 +74,12 @@ export class MapRenderer {
 
       // Cancel rotation on user interaction
       this.map.on('mousedown', () => {
-        this.stopRotation();
         if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
       });
       this.map.on('wheel', () => {
-        this.stopRotation();
         if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
       });
       this.map.on('touchstart', () => {
-        this.stopRotation();
         if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
       });
 
@@ -214,28 +211,9 @@ export class MapRenderer {
   }
 
   /** --------------------------------------------------------------
-   *  Rotation (demo) helpers
-   *  -------------------------------------------------------------- */
-  private startRotation() {
-    if (!this.animationId) this.animationId = requestAnimationFrame(t => this.rotateCamera(t));
-  }
-
-  private stopRotation() {
-    if (this.animationId) {
-      cancelAnimationFrame(this.animationId);
-      this.animationId = null;
-    }
-  }
-
-  private rotateCamera(timestamp: number) {
-    this.map.rotateTo((timestamp / 500) % 360, { duration: 0 });
-    this.animationId = requestAnimationFrame(t => this.rotateCamera(t));
-  }
-
-  /** --------------------------------------------------------------
    *  Tactical marker UI
    *  -------------------------------------------------------------- */
-  private addTacticalMarker(update: any) {
+  public addTacticalMarker(update: any) {
     const el = document.createElement('div');
     el.style.cssText = `width:16px; height:16px; background:${
       update.severity === 'critical' ? '#ff0000' : '#00f2ff'
