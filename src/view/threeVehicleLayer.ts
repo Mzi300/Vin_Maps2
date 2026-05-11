@@ -77,7 +77,7 @@ export class ThreeVehicleLayer {
     group.add(arrow);
 
     // Add a glowing core under the arrow (Tactical Pulse)
-    const glowGeometry = new THREE.CircleGeometry(1.2, 32);
+    const glowGeometry = new THREE.CircleGeometry(1.0, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: 0x00f2ff,
       transparent: true,
@@ -89,8 +89,8 @@ export class ThreeVehicleLayer {
     glow.position.z = -0.1;
     group.add(glow);
 
-    // Scale up for visibility
-    group.scale.set(6, 6, 6);
+    // Scale to standard GPS size
+    group.scale.set(2.5, 2.5, 2.5);
     
     return group;
   }
