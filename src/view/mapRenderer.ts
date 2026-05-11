@@ -26,10 +26,10 @@ export class MapRenderer {
     this.map = new mapboxgl.Map({
       container: this.containerId,
       style: 'mapbox://styles/mapbox/standard',
-      center: [28.2293, -25.7479], // Generic South Africa center
-      zoom: 12,                  
-      pitch: 0,                   
-      bearing: 0,                  
+      center: [28.0473, -26.2041], // Tactical center
+      zoom: 16.2,                  // Tightened cinematic zoom
+      pitch: 68,                   // Tightened cinematic perspective
+      bearing: 0,                  // Forward facing
 
       antialias: true,
       interactive: true,
