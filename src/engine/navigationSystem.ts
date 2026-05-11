@@ -126,7 +126,6 @@ export class NavigationSystem {
     if (rawDist < 5.0 && rawSpeed < this.speedThreshold) {
       this.currentState.isMoving = false;
       this.currentState.speed = 0;
-      this.lastSpeed = 0; // CRITICAL: Stop extrapolation
       this.lastPosition = newPos; // Sync to stop future jumps
       this.lastTime = now;
       if (this.onUpdate) this.onUpdate(this.currentState);
