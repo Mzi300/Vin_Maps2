@@ -1344,18 +1344,18 @@ body {
 .maneuver-card {
   position: absolute;
   top: 2rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 450px;
+  right: 2rem; /* Move to Top Right */
+  width: 280px; /* Reduced width */
   display: flex;
   align-items: center;
-  gap: 1.5rem;
-  padding: 1rem 2rem;
+  gap: 1rem;
+  padding: 0.8rem 1.2rem;
   z-index: 1100;
+  border-radius: 12px;
 }
 
 .maneuver-icon {
-  font-size: 2.5rem;
+  font-size: 1.8rem; /* Reduced size */
   font-weight: 900;
   color: var(--primary-accent);
 }
@@ -1366,10 +1366,11 @@ body {
 }
 
 .instruction-main {
-  font-size: 1.2rem;
+  font-size: 1rem; /* Reduced size */
   font-weight: 800;
   text-transform: uppercase;
   color: #fff;
+  line-height: 1.2;
 }
 
 .instruction-sub {
