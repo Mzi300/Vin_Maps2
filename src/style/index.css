@@ -1344,8 +1344,8 @@ body {
 .maneuver-card {
   position: absolute;
   top: 2rem;
-  right: 2rem; /* Move to Top Right */
-  width: 280px; /* Reduced width */
+  left: 2rem; /* Move to Top Left */
+  width: 280px;
   display: flex;
   align-items: center;
   gap: 1rem;
