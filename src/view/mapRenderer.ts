@@ -335,11 +335,6 @@ export class MapRenderer {
     if (this.cameraController) {
       this.cameraController.update(coords, heading, speed);
     }
-
-    // Update Visual Effects Guidance system if destination is set
-    if (this.visualEffects && this.visualEffects.getDestination()) {
-      this.visualEffects.updateGuidanceSystem(coords, this.visualEffects.getDestination()!);
-    }
   }
 
 }
