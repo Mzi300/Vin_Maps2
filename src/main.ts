@@ -205,12 +205,18 @@ class App {
 
       geoService.initializeLocation((coords) => {
         this.currentOriginCoords = coords;
-        this.map.flyTo(coords[0], coords[1], 15.5); 
+        
+        // IMMEDIATE FLY: Move to user's real coordinates on launch
+        this.map.flyTo(coords[0], coords[1], 16.5); 
+        
+        // Set origin input to 'Current Location'
+        const originInput = document.getElementById('origin-input') as HTMLInputElement;
+        if (originInput) originInput.value = 'Current Location';
         
         // Force the icon to show at the start
         if (this.map.visualEffects) {
           this.map.visualEffects.updateUserVehicle(coords, 0);
-          (this.map.visualEffects as any).updateUserLocationGlow(coords);
+          this.map.visualEffects.updateUserLocationGlow(coords);
         }
 
         this.navSystem.snapToPosition(coords, 0);
