@@ -460,9 +460,11 @@ class App {
     
     this.navSystem.start(route, TRANSPORT_PROFILES[this.currentTransportType].mapboxProfile);
     
-    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
-    document.getElementById('recenter-btn')!.style.display = 'flex';
     document.getElementById('maneuver-card')!.style.display = 'flex';
+    
+    if (this.map.visualEffects) {
+      this.map.visualEffects.setNavigating(true);
+    }
     
     // Ensure Intel dropdown remains accessible
     const intelDropdown = document.querySelector('.dropdown-container') as HTMLElement;
@@ -497,12 +499,11 @@ class App {
     this.map.exitNavigationMode();
     this.map.visualEffects.clearRoute();
     
-    document.getElementById('nav-bottom-bar')!.style.display = 'none';
-    document.getElementById('recenter-btn')!.style.display = 'none';
-    document.getElementById('maneuver-card')!.style.display = 'none';
-    document.getElementById('hazard-fab')!.style.display = 'none';
-    document.getElementById('directions-view')!.style.display = 'none';
     document.getElementById('search-view')!.style.display = 'flex';
+    
+    if (this.map.visualEffects) {
+      this.map.visualEffects.setNavigating(false);
+    }
     
     this.showTripSummary();
   }
@@ -539,6 +540,7 @@ class App {
 
       if (this.map.visualEffects) {
         this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
+        this.map.visualEffects.updateDestMarkerVisibility(state.totalDistanceRemaining);
       }
 
       const navBottomBar = document.getElementById('nav-bottom-bar');

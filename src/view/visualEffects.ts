@@ -141,6 +141,26 @@ export class VisualEffects {
     })
       .setLngLat(coords)
       .addTo(this.map);
+
+    // Hide initially if navigating
+    if (this.isNavigating) {
+      el.style.visibility = 'hidden';
+    }
+  }
+
+  private isNavigating: boolean = false;
+  public setNavigating(active: boolean) {
+    this.isNavigating = active;
+    if (this.destMarker) {
+      this.destMarker.getElement().style.visibility = active ? 'hidden' : 'visible';
+    }
+  }
+
+  public updateDestMarkerVisibility(distanceRemaining: number) {
+    if (this.destMarker) {
+      // Show marker when within 50 meters of destination
+      this.destMarker.getElement().style.visibility = (distanceRemaining < 50) ? 'visible' : 'hidden';
+    }
   }
 
   /**
