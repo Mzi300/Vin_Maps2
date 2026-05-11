@@ -209,6 +209,11 @@ class App {
         // IMMEDIATE FLY: Move to user's real coordinates on launch
         this.map.flyTo(coords[0], coords[1], 16.5); 
         
+        // Update camera controller with initial position
+        if (this.map.cameraController) {
+          this.map.cameraController.update(coords, 0, 0, true);
+        }
+        
         // Set origin input to 'Current Location'
         const originInput = document.getElementById('origin-input') as HTMLInputElement;
         if (originInput) originInput.value = 'Current Location';
