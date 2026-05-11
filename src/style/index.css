@@ -1343,15 +1343,19 @@ body {
 
 .maneuver-card {
   position: absolute;
-  top: 2rem;
-  left: 2rem; /* Move to Top Left */
-  width: 280px;
+  top: 1.5rem;   /* Safe margin from top */
+  left: 1.5rem;  /* Safe margin from left */
+  width: 300px;  /* Slightly wider for text */
   display: flex;
   align-items: center;
   gap: 1rem;
-  padding: 0.8rem 1.2rem;
-  z-index: 1100;
+  padding: 1rem 1.5rem;
+  z-index: 9999; /* HIGHEST Z-INDEX to ensure visibility */
   border-radius: 12px;
+  background: rgba(10, 10, 10, 0.95); /* Opaque for readability */
+  border: 1px solid var(--primary-accent); /* Lime border for pop */
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.8);
+  pointer-events: auto;
 }
 
 .maneuver-icon {
