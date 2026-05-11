@@ -201,17 +201,25 @@ class App {
       const loader = document.getElementById('startup-loader');
       const loaderStatus = document.getElementById('loader-status');
       
-      if (loaderStatus) loaderStatus.innerText = 'Acquiring high-precision lock...';
+      if (loaderStatus) loaderStatus.innerText = 'WAITING FOR TACTICAL GPS LOCK...';
+      
+      // Keep map invisible until GPS is acquired
+      const mapCanvas = this.map.map.getCanvas();
+      if (mapCanvas) mapCanvas.style.opacity = '0';
 
-      geoService.initializeLocation((coords) => {
+      geoService.initializeLocation((coords: [number, number]) => {
         this.currentOriginCoords = coords;
         
-        // SNAP TO GPS: Move to wherever the user is standing right now
+        // INSTANT SNAP TO REAL GPS
         this.map.map.jumpTo({
           center: coords,
-          zoom: 18,
-          pitch: 68
+          zoom: 18.5,
+          pitch: 70
         });
+        
+        // Show map now that we are at the right place
+        const mapCanvas = this.map.map.getCanvas();
+        if (mapCanvas) mapCanvas.style.opacity = '1';
         
         // Update camera controller with initial position
         if (this.map.cameraController) {

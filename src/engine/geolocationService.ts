@@ -14,16 +14,18 @@ export class GeolocationService {
 
       navigator.geolocation.getCurrentPosition(
         (position) => {
+          console.log("[GeolocationService] Fresh tactical lock acquired:", position.coords.accuracy, "m accuracy");
           resolve([position.coords.longitude, position.coords.latitude]);
         },
         (error) => {
-          console.warn("GPS error:", error);
+          const reasons = ["Permission Denied", "Position Unavailable", "Timeout"];
+          console.error(`[GeolocationService] Critical GPS Failure: ${reasons[error.code - 1] || "Unknown"}`);
           resolve(this.defaultLocation);
         },
         {
           enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
+          timeout: 8000,
+          maximumAge: 100 // Force near-zero cache
         }
       );
     });

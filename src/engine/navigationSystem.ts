@@ -158,7 +158,7 @@ export class NavigationSystem {
     if (!this.hasDetectedMotion) {
       const distFromStart = this.calculateDistance(this.currentState.currentPosition, smoothedPos);
       // Require either decent speed or significant distance to "unlock" the vehicle
-      if (smoothedSpeed > 2.0 || distFromStart > 10.0) {
+      if (smoothedSpeed > 1.0 || distFromStart > 5.0) {
         this.hasDetectedMotion = true;
         console.log('[NavigationSystem] Motion detected - Unlocking vehicle icon.');
       } else {
@@ -176,7 +176,14 @@ export class NavigationSystem {
       totalDistanceRemaining: this.route ? this.calculateTotalDistanceRemaining(smoothedPos) : 0
     };
 
-    // 7. Maneuver & Step Tracking
+    // 7. Snap-to-Road Logic
+    // If we have a route, snap the currentPosition to the nearest point on the route
+    if (this.route && this.route.coordinates.length >= 2) {
+      const snapped = this.snapToRoute(smoothedPos);
+      this.currentState.currentPosition = snapped;
+    }
+
+    // 8. Maneuver & Step Tracking
     if (this.route) this.trackManeuvers(smoothedPos);
 
     // 8. Off-Route Detection
@@ -308,6 +315,38 @@ export class NavigationSystem {
     } else {
       this.offRouteCount = 0;
     }
+  }
+
+  private snapToRoute(pos: [number, number]): [number, number] {
+    if (!this.route) return pos;
+
+    let minDistance = Infinity;
+    let snappedPoint = pos;
+
+    for (let i = 0; i < this.route.coordinates.length - 1; i++) {
+      const p1 = this.route.coordinates[i];
+      const p2 = this.route.coordinates[i + 1];
+      const projected = this.projectPointOnSegment(pos, p1, p2);
+      const dist = this.calculateDistance(pos, projected);
+
+      if (dist < minDistance) {
+        minDistance = dist;
+        snappedPoint = projected;
+      }
+    }
+
+    // Only snap if we are reasonably close to the road (e.g., < 40m)
+    // If further away, let the off-route logic handle recalculation
+    return minDistance < 40 ? snappedPoint : pos;
+  }
+
+  private projectPointOnSegment(p: [number, number], a: [number, number], b: [number, number]): [number, number] {
+    const atob = [b[0] - a[0], b[1] - a[1]];
+    const atop = [p[0] - a[0], p[1] - a[1]];
+    const len = atob[0] * atob[0] + atob[1] * atob[1];
+    let dot = atop[0] * atob[0] + atop[1] * atob[1];
+    const t = Math.min(1, Math.max(0, dot / len));
+    return [a[0] + atob[0] * t, a[1] + atob[1] * t];
   }
 
   private speak(text: string) {

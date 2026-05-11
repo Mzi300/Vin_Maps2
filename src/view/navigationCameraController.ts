@@ -54,7 +54,7 @@ export class NavigationCameraController {
       lerpPitch: 0.06,
       lerpZoom: 0.06,
       rollIntensity: 0.4,
-      lookAhead: 2.2 
+      lookAhead: 3.5 
     },
     [CameraMode.OVERVIEW]: {
       pitch: 0,
