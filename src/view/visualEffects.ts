@@ -163,13 +163,18 @@ export class VisualEffects {
     if (this.destMarker) this.destMarker.remove();
 
     const el = document.createElement('div');
-    el.className = 'destination-pulse';
+    el.className = 'tactical-destination-marker';
     el.innerHTML = `
-      <div class="pulse-ring"></div>
-      <div class="pulse-center">🎯</div>
+      <div class="dest-outer-ring"></div>
+      <div class="dest-inner-circle">
+        <div class="dest-arrow"></div>
+      </div>
     `;
 
-    this.destMarker = new mapboxgl.Marker(el)
+    this.destMarker = new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
+    })
       .setLngLat(coords)
       .addTo(this.map);
   }
