@@ -28,8 +28,8 @@ export class MapRenderer {
       container: this.containerId,
       style: 'mapbox://styles/mapbox/standard',
       center: [28.0473, -26.2041], // Tactical center
-      zoom: 21.5,                  // Cinematic driving zoom
-      pitch: 80,                   // Cinematic driving perspective
+      zoom: 16.2,                  // Tightened cinematic zoom
+      pitch: 68,                   // Tightened cinematic perspective
       bearing: 0,                  // Forward facing
 
       antialias: true,
@@ -63,15 +63,28 @@ export class MapRenderer {
 
       // 5. Stylised label appearance
       this.stylizeLabels();
+
+      // 6. Smooth Zoom Tuning
+      this.map.scrollZoom.setWheelZoomRate(1/600); 
+      this.map.scrollZoom.setZoomRate(1/600);
     });
 
     this.map.on('load', () => {
-      this.startRotation();
+      // this.startRotation();
 
       // Cancel rotation on user interaction
-      this.map.on('mousedown', () => this.stopRotation());
-      this.map.on('wheel', () => this.stopRotation());
-      this.map.on('touchstart', () => this.stopRotation());
+      this.map.on('mousedown', () => {
+        this.stopRotation();
+        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
+      });
+      this.map.on('wheel', () => {
+        this.stopRotation();
+        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
+      });
+      this.map.on('touchstart', () => {
+        this.stopRotation();
+        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
+      });
 
       // 6. Interactive POIs
       this.map.on('click', 'poi-label', (e) => {
@@ -239,8 +252,8 @@ export class MapRenderer {
     this.map.flyTo({
       center: [lng, lat],
       zoom: zoom,
-      pitch: 75, // Windshield angle
-      speed: 1.2, // Faster for immediate feel
+      pitch: 68, 
+      speed: 1.0, 
       curve: 1.0,
       essential: true
     });
@@ -281,10 +294,10 @@ export class MapRenderer {
     // 2. Immediate Focus: Fly to origin facing the correct direction
     this.map.flyTo({
       center: origin,
-      zoom: 22.2,
-      pitch: 82,
+      zoom: 19.5,
+      pitch: 80,
       bearing: initialBearing,
-      duration: 800, // Faster transition
+      duration: 1200, 
       essential: true
     });
 
@@ -294,21 +307,22 @@ export class MapRenderer {
       
       this.map.easeTo({
         center: origin,
-        zoom: 22.2,
-        pitch: 82,
+        zoom: 16.2,
+        pitch: 68,
         bearing: initialBearing,
         duration: 50 // Near instant
       });
 
-      this.map.once('moveend', () => {
-        if (this.visualEffects) this.visualEffects.startNavigationAnimation();
-      });
+      // No auto-simulation during live nav
+      // this.map.once('moveend', () => {
+      //   if (this.visualEffects) this.visualEffects.startNavigationAnimation();
+      // });
     });
   }
 
   public resetCameraState(coords: [number, number], heading: number) {
     if (this.cameraController) {
-      this.cameraController.update(coords, heading, 0);
+      this.cameraController.update(coords, heading, 0, true);
     }
   }
 

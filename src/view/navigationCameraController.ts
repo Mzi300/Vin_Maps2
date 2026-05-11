@@ -42,19 +42,19 @@ export class NavigationCameraController {
   // Configurable presets
   private presets: Record<CameraMode, any> = {
     [CameraMode.DRIVING]: {
-      pitch: 82, // Extreme horizon view
-      zoom: 22.5, // Absolute theoretical limit
-      minPitch: 65,
-      maxPitch: 85,
-      minZoom: 21.0,
-      maxZoom: 24.0, // Over-limit for safety
-      padding: { bottom: 0 }, // REMOVED PADDING to bring camera down
-      lerpPos: 0.15, // Faster following
-      lerpBearing: 0.1,
-      lerpPitch: 0.1,
-      lerpZoom: 0.3, // Instant zoom
-      rollIntensity: 0.2,
-      lookAhead: 1.5 // Focus closer to front
+      pitch: 68, // Grounded tactical perspective
+      zoom: 16.2, // Slightly tighter cinematic view
+      minPitch: 60,
+      maxPitch: 78,
+      minZoom: 15.0,
+      maxZoom: 18.5,
+      padding: { bottom: 180 }, // Adjusted offset for tighter zoom
+      lerpPos: 0.08, 
+      lerpBearing: 0.05, 
+      lerpPitch: 0.06,
+      lerpZoom: 0.06,
+      rollIntensity: 0.4,
+      lookAhead: 2.2 
     },
     [CameraMode.OVERVIEW]: {
       pitch: 0,
@@ -145,7 +145,7 @@ export class NavigationCameraController {
   private extrapolationTime: number = 0;
   private readonly MAX_EXTRAPOLATION_TIME = 3000; // 3 seconds
 
-  public update(coords: [number, number], heading: number, speed: number) {
+  public update(coords: [number, number], heading: number, speed: number, force: boolean = false) {
     if (this.mode === CameraMode.FREE_EXPLORE) return;
 
     const now = Date.now();
@@ -154,19 +154,25 @@ export class NavigationCameraController {
 
     // Handle stationary/low-speed jitter
     const minHeadingSpeed = 1.0; // m/s
-    if (speed < minHeadingSpeed) {
-      heading = this.target.bearing; // Keep last known bearing
+    if (speed >= minHeadingSpeed || force) {
+      this.target.bearing = heading;
     }
 
     this.target.center = coords;
-    this.target.bearing = heading;
     this.lastSpeed = speed;
+
+    if (force) {
+      this.current.bearing = this.target.bearing;
+      this.current.center = [...this.target.center];
+    }
 
     // Dynamic Zoom/Pitch based on speed
     if (this.mode === CameraMode.DRIVING) {
       const p = this.presets[CameraMode.DRIVING];
-      this.target.zoom = Math.max(p.minZoom, p.maxZoom - speed * 0.15);
-      this.target.pitch = Math.max(p.minPitch, p.maxPitch - speed * 0.5);
+      // Zoom out slightly at speed for visibility, but keep it tight
+      this.target.zoom = Math.max(p.minZoom, p.maxZoom - (speed * 0.08)); 
+      // Tilt closer to horizon as speed increases
+      this.target.pitch = Math.min(p.maxPitch, p.pitch + (speed * 0.15));
     }
   }
 
@@ -263,7 +269,8 @@ export class NavigationCameraController {
       center: [this.current.center[0], this.current.center[1]],
       bearing: this.current.bearing + currentRoll,
       zoom: this.current.zoom,
-      pitch: this.current.pitch
+      pitch: this.current.pitch,
+      padding: preset.padding || { top: 0, bottom: 0, left: 0, right: 0 }
     });
   }
 

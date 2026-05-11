@@ -780,6 +780,87 @@ body {
   border-radius: 10px;
 }
 
+.sidebar-panel {
+  position: absolute;
+  top: 0;
+  left: -400px;
+  width: 350px;
+  height: 100%;
+  background: rgba(10, 10, 10, 0.95);
+  border-right: 1px solid var(--glass-border);
+  z-index: 2000;
+  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(20px);
+}
+
+.sidebar-panel.open {
+  left: 0;
+}
+
+.sidebar-header {
+  padding: 2rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--glass-border);
+}
+
+.sidebar-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.sidebar-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-item {
+  background: transparent;
+  border: 1px solid transparent;
+  color: #ccc;
+  padding: 0.8rem 1rem;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  border-color: var(--glass-border);
+}
+
+.sidebar-divider {
+  height: 1px;
+  background: var(--glass-border);
+  margin: 0.5rem 0;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.8rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.close-btn:hover {
+  color: #fff;
+}
+
+
 .recenter-btn {
   position: absolute;
   bottom: 6rem;
@@ -1018,5 +1099,291 @@ body {
   0%, 100% { opacity: 0.4; transform: scaleX(1); }
   50% { opacity: 1; transform: scaleX(1.5); }
 }
+
+/* GTA CINEMATIC THEME OVERRIDES */
+#cinematic-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+}
+
+.top-controls {
+  position: absolute;
+  top: 3rem; /* Shifted down for cleaner breathing room */
+  left: 3rem; /* Perfect left alignment */
+  width: 440px;
+  pointer-events: auto;
+  z-index: 1001;
+}
+
+.command-bar {
+  padding: 0.8rem 1rem;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+.gta-hud-card {
+  background: rgba(0, 0, 0, 0.85);
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.gta-minimap {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  width: 280px;
+  height: 180px;
+  background: #000;
+  border: 4px solid #333;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 0 30px rgba(0,0,0,0.8);
+  z-index: 100;
+}
+
+.minimap-bezel {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(255,255,255,0.2);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.minimap-render {
+  width: 100%;
+  height: 100%;
+}
+
+.bottom-hud-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  pointer-events: none;
+  display: flex;
+  align-items: flex-end;
+  padding: 0 0 3rem 3rem; /* Consistent 3rem left margin */
+}
+
+.gta-stats-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.gta-info-card {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1rem 1.5rem;
+  border-left: 5px solid var(--primary-accent);
+  min-width: 300px;
+  pointer-events: auto;
+}
+
+.gta-text-title {
+  display: block;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 900;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.gta-text-sub {
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--primary-accent);
+}
+
+.gta-hud-pill {
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 50px;
+  padding: 0.8rem 2rem;
+  border: 1px solid rgba(255,255,255,0.2);
+  pointer-events: auto;
+}
+
+.gta-hud-circle {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: all 0.2s;
+}
+
+.gta-hud-circle:hover {
+  background: var(--primary-accent);
+  color: #000;
+  border-color: #fff;
+}
+
+.floating-controls {
+  position: absolute;
+  right: 2rem;
+  bottom: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.dropdown-container {
+  position: relative;
+  display: inline-block;
+  pointer-events: auto;
+}
+
+.dropdown-toggle {
+  background: rgba(0, 0, 0, 0.8);
+  color: #fff;
+  padding: 0.8rem 1.2rem;
+  border-radius: 8px;
+  border: 1px solid var(--primary-accent);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+.dropdown-menu {
+  position: absolute;
+  bottom: 120%;
+  left: 0;
+  width: 250px;
+  background: rgba(10, 10, 10, 0.95);
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  padding: 1rem;
+  display: none;
+  flex-direction: column;
+  gap: 0.5rem;
+  z-index: 2000;
+  backdrop-filter: blur(20px);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+}
+
+.dropdown-menu.active {
+  display: flex;
+  animation: slideInUpMini 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes slideInUpMini {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.dropdown-section label {
+  display: block;
+  font-size: 0.7rem;
+  color: var(--primary-accent);
+  margin-bottom: 0.5rem;
+  letter-spacing: 2px;
+  font-weight: 800;
+}
+
+.cat-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid transparent;
+  color: #eee;
+  padding: 0.6rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+  width: 100%;
+}
+
+.cat-btn:hover {
+  background: rgba(0, 242, 255, 0.1);
+  border-color: var(--primary-accent);
+  color: #fff;
+}
+
+.arrow {
+  transition: transform 0.3s;
+  display: inline-block;
+}
+
+.maneuver-card {
+  position: absolute;
+  top: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 450px;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 1rem 2rem;
+  z-index: 1100;
+}
+
+.maneuver-icon {
+  font-size: 2.5rem;
+  font-weight: 900;
+  color: var(--primary-accent);
+}
+
+.maneuver-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.instruction-main {
+  font-size: 1.2rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #fff;
+}
+
+.instruction-sub {
+  font-size: 0.9rem;
+  color: var(--primary-accent);
+  font-family: monospace;
+}
+
+.menu-btn {
+  background: transparent;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 5px;
+  transition: color 0.2s;
+}
+
+.menu-btn:hover {
+  color: var(--primary-accent);
+}
+
+
 
 

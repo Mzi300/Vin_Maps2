@@ -15,6 +15,7 @@ export class NavigationSystem {
   private watchId: number | null = null;
   private lastPosition: [number, number] | null = null;
   private lastTime: number = 0;
+  private lastSpeed: number = 0;
   
   // Dynamic parameters based on profile
   private speedThreshold: number = 3.0; // meters per second (higher to avoid jitter)

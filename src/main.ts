@@ -58,150 +58,117 @@ class App {
     
     root.innerHTML = `
       <div class="scanline"></div>
-      <div class="radar-scan"></div>
-      <div id="map-container"></div>
-      
-      <div id="sidebar" class="glass-panel sidebar-panel">
-        <div class="sidebar-header">
-          <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
-          <button id="close-sidebar" class="close-btn">×</button>
-        </div>
-        <div class="sidebar-content">
-          <div class="sidebar-section">
-            <button class="sidebar-item">⭐ Saved Sectors</button>
-            <button class="sidebar-item">🕒 Recent Missions</button>
-            <button class="sidebar-item">✍️ Contributions</button>
+      <div id="cinematic-container">
+        <div id="map-container"></div>
+        
+        <div id="sidebar" class="glass-panel sidebar-panel">
+          <div class="sidebar-header">
+            <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
+            <button id="close-sidebar" class="close-btn">×</button>
           </div>
-          <div class="sidebar-divider"></div>
-          <div class="sidebar-section">
-            <button class="sidebar-item">📈 Your Timeline</button>
-            <button class="sidebar-item">🛡️ Data in Maps</button>
-            <button class="sidebar-item">🔗 Share or Embed</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="ui-overlay">
-        <!-- Maneuver Instruction Card -->
-        <div id="maneuver-card" class="glass-panel maneuver-card" style="display: none;">
-          <div class="maneuver-icon" id="maneuver-icon">↑</div>
-          <div class="maneuver-text">
-            <span id="maneuver-instruction" class="instruction-main">Follow route</span>
-            <span id="maneuver-dist" class="instruction-sub">0 m</span>
-          </div>
-        </div>
-
-        <button id="weather-toggle" class="weather-toggle-btn">Toggle Weather</button>
-        <div class="top-controls">
-          <div id="routing-engine" class="glass-panel command-bar search-state">
-            <div id="search-view" class="search-section">
-              <div class="input-group" style="width: 100%;">
-                <button id="open-sidebar" class="menu-btn" style="margin-right: 5px;">☰</button>
-                <input type="text" class="search-input" placeholder="Search South Africa..." id="dest-input" autocomplete="off" style="flex: 1;">
-                <button id="locate-me" class="menu-btn" style="font-size: 1.1rem; padding: 0 5px;" title="My Location">📍</button>
-                <button id="lock-dest" class="tactical-btn" style="padding: 0.4rem; font-size: 0.9rem;" title="Directions">↱</button>
-              </div>
-              <div id="suggestions-list" class="glass-panel suggestions-panel" style="display: none;"></div>
+          <div class="sidebar-content">
+            <div class="sidebar-section">
+              <button class="sidebar-item">⭐ Saved Sectors</button>
+              <button class="sidebar-item">🕒 Recent Missions</button>
+              <button class="sidebar-item">✍️ Contributions</button>
             </div>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section">
+              <button class="sidebar-item">📈 Your Timeline</button>
+              <button class="sidebar-item">🛡️ Data in Maps</button>
+              <button class="sidebar-item">🔗 Share or Embed</button>
+            </div>
+          </div>
+        </div>
 
-            <div id="directions-view" class="directions-section" style="display: none; flex-direction: column; align-items: stretch; gap: 0.8rem;">
-              <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
-                <button id="close-directions" class="menu-btn" style="font-size: 1.2rem; padding: 0;">←</button>
-                <div class="transport-strip" id="transport-step" style="gap: 0.2rem;">
-                  ${Object.values(TRANSPORT_PROFILES).map(p => `
-                    <button class="transport-tab" data-type="${p.type}" title="${p.type.toUpperCase()}">
-                      <span class="tab-icon">${p.icon}</span>
-                      <span class="tab-time">${Math.floor(Math.random() * 30 + 5)}m</span>
-                    </button>
-                  `).join('')}
+        <div class="ui-overlay">
+          <!-- TOP HUD: Cinematic Maneuvers -->
+          <div id="maneuver-card" class="gta-hud-card maneuver-card" style="display: none;">
+            <div class="maneuver-icon" id="maneuver-icon">↑</div>
+            <div class="maneuver-text">
+              <span id="maneuver-instruction" class="instruction-main">Follow route</span>
+              <span id="maneuver-dist" class="instruction-sub">0 m</span>
+            </div>
+          </div>
+
+          <div class="top-controls">
+            <div id="routing-engine" class="gta-hud-card command-bar search-state">
+              <div id="search-view" class="search-section">
+                <div class="input-group" style="width: 100%;">
+                  <button id="open-sidebar" class="menu-btn" style="margin-right: 5px;">☰</button>
+                  <input type="text" class="search-input" placeholder="Search South Africa..." id="dest-input" autocomplete="off" style="flex: 1;">
+                  <button id="locate-me" class="menu-btn" style="font-size: 1.1rem; padding: 0 5px;" title="My Location">📍</button>
+                  <button id="lock-dest" class="tactical-btn" style="padding: 0.4rem; font-size: 0.9rem;" title="Directions">↱</button>
+                </div>
+                <div id="suggestions-list" class="glass-panel suggestions-panel" style="display: none;"></div>
+              </div>
+
+              <div id="directions-view" class="directions-section" style="display: none; flex-direction: column; align-items: stretch; gap: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <button id="close-directions" class="menu-btn" style="font-size: 1.2rem; padding: 0;">←</button>
+                  <div class="transport-strip" id="transport-step" style="gap: 0.2rem;">
+                    ${Object.values(TRANSPORT_PROFILES).map(p => `
+                      <button class="transport-tab" data-type="${p.type}" title="${p.type.toUpperCase()}">
+                        <span class="tab-icon">${p.icon}</span>
+                        <span class="tab-time">${Math.floor(Math.random() * 30 + 5)}m</span>
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+                <div class="route-inputs" style="width: 100%;">
+                  <div class="input-group mini" style="position: relative;">
+                    <span class="dot origin"></span>
+                    <input type="text" class="mini-input" id="origin-input" placeholder="Starting point..." autocomplete="off">
+                    <button id="locate-origin" class="mini-gps-btn" title="Use current location">📍</button>
+                    <div id="origin-suggestions" class="glass-panel suggestions-panel mini-sugg" style="display: none;"></div>
+                  </div>
+                  <div class="input-group mini">
+                    <span class="dot dest"></span>
+                    <input type="text" class="mini-input" id="final-dest-display" readonly>
+                  </div>
                 </div>
               </div>
-              <div class="route-inputs" style="width: 100%;">
-                <div class="input-group mini" style="position: relative;">
-                  <span class="dot origin"></span>
-                  <input type="text" class="mini-input" id="origin-input" placeholder="Starting point..." autocomplete="off">
-                  <button id="locate-origin" class="mini-gps-btn" title="Use current location">📍</button>
-                  <div id="origin-suggestions" class="glass-panel suggestions-panel mini-sugg" style="display: none;"></div>
+            </div>
+          </div>
+
+          <!-- BOTTOM HUD: GTA Style Stats -->
+          <div class="bottom-hud-container">
+            <div class="gta-stats-panel">
+              <div class="glass-panel dropdown-container">
+                <button id="poi-dropdown-toggle" class="cat-btn dropdown-toggle">
+                  🔍 Explore Intel <span class="arrow">▼</span>
+                </button>
+                <div id="poi-dropdown-menu" class="glass-panel dropdown-menu">
+                  <div class="dropdown-section">
+                    <label>VIMAPS INTEL</label>
+                    <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
+                    <button class="cat-btn" data-poi="police">🛡️ Security</button>
+                    <button class="cat-btn" data-poi="bank">🏦 Financial</button>
+                    <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
+                    <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
+                  </div>
                 </div>
-                <div class="input-group mini">
-                  <span class="dot dest"></span>
-                  <input type="text" class="mini-input" id="final-dest-display" readonly>
+              </div>
+
+              <div id="info-readout" style="display: none;"></div>
+
+              <div id="nav-bottom-bar" class="gta-hud-pill nav-bar-minimal" style="display: none;">
+                <div class="nav-info-group">
+                  <span id="nav-eta-time" class="nav-main-eta">--</span>
+                  <div class="nav-sub-info">
+                    <span id="nav-distance">--</span> • <span id="nav-arrival">--</span>
+                  </div>
                 </div>
+                <button id="exit-nav" class="exit-nav-btn">EXIT</button>
               </div>
             </div>
-          </div>
-        </div>
-
-        <div class="bottom-controls">
-          <div class="glass-panel dropdown-container">
-            <button id="poi-dropdown-toggle" class="cat-btn dropdown-toggle">
-              🔍 Explore Intel <span class="arrow">▼</span>
-            </button>
-            <div id="poi-dropdown-menu" class="glass-panel dropdown-menu">
-              <div class="dropdown-section">
-                <label>VIMAPS INTEL</label>
-                <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
-                <button class="cat-btn" data-poi="police">🛡️ Security</button>
-                <button class="cat-btn" data-poi="bank">🏦 Financial</button>
-                <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
-                <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
-              </div>
-              <div class="dropdown-divider"></div>
-              <div class="dropdown-section">
-                <label>MAPS EXPLORER</label>
-                <button class="cat-btn" data-poi="restaurant">🍴 Restaurants</button>
-                <button class="cat-btn" data-poi="hotel">🏨 Hotels</button>
-                <button class="cat-btn" data-poi="attraction">🎡 Things to do</button>
-                <button class="cat-btn" data-poi="museum">🏛️ Museums</button>
-                <button class="cat-btn" data-poi="transit">🚌 Transit</button>
-                <button class="cat-btn" data-poi="pharmacy">💊 Pharmacies</button>
-                <button class="cat-btn" data-poi="atm">🏧 ATMs</button>
-              </div>
-              <div class="dropdown-divider"></div>
-              <div class="dropdown-section">
-                <button class="sidebar-item" id="open-google-maps">🌐 Search Google Maps</button>
-              </div>
-            </div>
-          </div>
-          
-          <div class="glass-panel info-readout" id="info-readout">
-            <div id="route-display" class="route-display">
-              <div id="route-idle">
-                <span id="route-title" class="tactical-title">SITREP: Johannesburg Sector</span>
-                <span id="route-eta" class="eta-badge">Awaiting mission parameters...</span>
-              </div>
-              <div id="route-active" style="display: none; flex-direction: column; gap: 4px;">
-                <div class="summary-row"><strong>Destination:</strong> <span id="summary-dest" class="glow-text">--</span></div>
-                <div class="summary-row"><strong>Distance:</strong> <span id="summary-dist">--</span></div>
-                <div class="summary-row"><strong>ETA:</strong> <span id="summary-eta">--</span></div>
-              </div>
-            </div>
-            
-            <div id="advanced-toggle-area" style="display: none; margin-top: 8px; border-top: 1px solid var(--glass-border); padding-top: 8px;">
-              <button id="toggle-advanced" class="text-btn" style="font-size: 0.7rem; color: var(--text-dim);">Advanced Tactical Data ▼</button>
-              <div id="advanced-details" style="display: none; margin-top: 5px; font-size: 0.7rem; color: var(--primary-accent); font-family: monospace;">
-                <div>Safety Score: <span id="detail-safety">--</span></div>
-                <div>System Latency: <span id="detail-latency">--</span></div>
-              </div>
-            </div>
-            <div id="ai-reasoning" class="ai-brief" style="display: none;"></div>
           </div>
 
-          <!-- Minimal Navigation Bar (Google Maps Style) -->
-          <div id="nav-bottom-bar" class="glass-panel nav-bar-minimal" style="display: none;">
-            <div class="nav-info-group">
-              <span id="nav-eta-time" class="nav-main-eta">--</span>
-              <div class="nav-sub-info">
-                <span id="nav-distance">--</span> • <span id="nav-arrival">--</span>
-              </div>
-            </div>
-            <button id="exit-nav" class="exit-nav-btn">EXIT</button>
+          <!-- Floating Controls -->
+          <div class="floating-controls">
+            <button id="recenter-btn" class="gta-hud-circle recenter-btn" style="display: none;" title="Re-center">🎯</button>
+            <button id="weather-toggle" class="gta-hud-circle weather-toggle-btn" title="Toggle Weather">⛅</button>
           </div>
-
-          <!-- Re-center Button (Visible when camera is unlocked) -->
-          <button id="recenter-btn" class="glass-panel recenter-btn" style="display: none;">
-            <span class="icon">🎯</span> RE-CENTER
-          </button>
 
           <!-- Hazard Reporting FAB -->
           <div id="hazard-fab" class="hazard-fab" style="display: none;">
@@ -233,6 +200,7 @@ class App {
           </div>
         </div>
       </div>
+    
     `;
 
     this.map = new MapRenderer('map-container', this.token!);
@@ -285,51 +253,57 @@ class App {
 
   private updateUIState(state: RoutingStateValue) {
     const statusText = document.getElementById('loader-status');
-    const reasoning = document.getElementById('ai-reasoning')!;
-    const status = document.getElementById('route-title')!;
-    const eta = document.getElementById('route-eta')!;
+    const reasoning = document.getElementById('ai-reasoning');
+    const status = document.getElementById('route-title');
+    const eta = document.getElementById('route-eta');
+    const routeIdle = document.getElementById('route-idle');
+    const routeActive = document.getElementById('route-active');
 
     switch (state) {
       case RoutingState.IDLE:
         if (statusText) statusText.innerText = 'Ready';
-        reasoning.style.display = 'none';
-        document.getElementById('route-idle')!.style.display = 'block';
-        document.getElementById('route-active')!.style.display = 'none';
-        document.getElementById('advanced-toggle-area')!.style.display = 'none';
-        status.innerText = 'SITREP: Johannesburg Sector';
-        eta.innerText = 'Waiting for target coordinates...';
+        if (reasoning) reasoning.style.display = 'none';
+        if (routeIdle) routeIdle.style.display = 'block';
+        if (routeActive) routeActive.style.display = 'none';
+        if (status) status.innerText = 'SITREP: Johannesburg Sector';
+        if (eta) eta.innerText = 'Waiting for target coordinates...';
         break;
       case RoutingState.SEARCHING:
-        eta.innerText = 'Synchronizing geocoding...';
+        if (eta) eta.innerText = 'Synchronizing geocoding...';
         break;
       case RoutingState.CALCULATING:
         if (statusText) statusText.innerText = 'Calculating Tactical Route...';
-        reasoning.style.display = 'block';
-        reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
-        document.getElementById('route-idle')!.style.display = 'block';
-        document.getElementById('route-active')!.style.display = 'none';
-        status.innerText = '[ CALCULATING ROUTE ]';
-        eta.innerHTML = `<span style="color:var(--warning)">PROCESSING...</span>`;
+        if (reasoning) {
+          reasoning.style.display = 'block';
+          reasoning.innerText = 'AI Assistant: Analyzing sector data and optimizing path...';
+        }
+        if (routeIdle) routeIdle.style.display = 'block';
+        if (routeActive) routeActive.style.display = 'none';
+        if (status) status.innerText = '[ CALCULATING ROUTE ]';
+        if (eta) eta.innerHTML = `<span style="color:var(--warning)">PROCESSING...</span>`;
         break;
       case RoutingState.READY:
         if (statusText) statusText.innerText = 'Tactical Route Established';
-        reasoning.style.display = 'block';
-        document.getElementById('route-idle')!.style.display = 'none';
-        document.getElementById('route-active')!.style.display = 'none'; 
-        document.getElementById('info-readout')!.style.display = 'none'; 
-        document.getElementById('advanced-toggle-area')!.style.display = 'none';
+        if (reasoning) reasoning.style.display = 'block';
+        if (routeIdle) routeIdle.style.display = 'none';
+        if (routeActive) routeActive.style.display = 'none'; 
+        const infoReadout = document.getElementById('info-readout');
+        if (infoReadout) infoReadout.style.display = 'none'; 
         const dropdown = document.querySelector('.dropdown-container');
         if (dropdown) dropdown.classList.add('hidden');
-        document.getElementById('nav-bottom-bar')!.style.display = 'flex';
+        const navBar = document.getElementById('nav-bottom-bar');
+        if (navBar) navBar.style.display = 'flex';
         break;
       case RoutingState.ERROR:
         if (statusText) statusText.innerText = 'Routing Failed';
-        reasoning.style.display = 'block';
-        reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
-        document.getElementById('route-idle')!.style.display = 'block';
-        document.getElementById('route-active')!.style.display = 'none';
-        status.innerText = '[ ERROR ]';
-        eta.innerHTML = `<span style="color:var(--danger)">FAILED</span>`;
+        if (reasoning) {
+          reasoning.style.display = 'block';
+          reasoning.innerText = 'AI Assistant: Strategic error. Could not establish route.';
+        }
+        if (routeIdle) routeIdle.style.display = 'block';
+        if (routeActive) routeActive.style.display = 'none';
+        if (status) status.innerText = '[ ERROR ]';
+        if (eta) eta.innerHTML = `<span style="color:var(--danger)">FAILED</span>`;
         break;
     }
   }
@@ -345,11 +319,12 @@ class App {
 
     const debouncedGeocode = this.debounce((input: HTMLInputElement, listId: string) => {
       const query = input.value;
-      if (query.length >= 2) {
+      if (query.length >= 1) {
         this.updateUIState(RoutingState.SEARCHING);
         this.fetchSuggestions(query, listId, input);
       } else {
-        document.getElementById(listId)!.style.display = 'none';
+        const list = document.getElementById(listId);
+        if (list) list.style.display = 'none';
       }
     }, 400);
 
@@ -360,9 +335,39 @@ class App {
     lockBtn?.addEventListener('click', () => this.advanceToTransportStep());
     closeDirections?.addEventListener('click', () => this.resetToSearch());
     locateBtn?.addEventListener('click', () => this.acquireLocation('origin-input'));
-    locateOriginBtn?.addEventListener('click', () => this.acquireLocation('origin-input'));
-
+    document.getElementById('open-sidebar')?.addEventListener('click', () => sidebar?.classList.add('open'));
     document.getElementById('close-sidebar')?.addEventListener('click', () => sidebar?.classList.remove('open'));
+
+    // Sidebar items functionality
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const text = (e.currentTarget as HTMLElement).innerText;
+        sidebar?.classList.remove('open');
+        
+        if (text.includes('Saved Sectors')) {
+          this.map.flyTo(28.0473, -26.2041, 15); // Tactical HQ
+          this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
+        } else if (text.includes('Recent Missions')) {
+          this.showTacticalNotification('LOADING MISSION ARCHIVES...');
+          setTimeout(() => this.showTacticalNotification('LAST MISSION: SANDTON SECTOR'), 1000);
+        } else if (text.includes('Contributions')) {
+          this.showTacticalNotification('INTEL REPORTED TO CENTRAL COMMAND');
+        } else if (text.includes('Your Timeline')) {
+          document.getElementById('summary-modal')!.style.display = 'block';
+        } else if (text.includes('Data in Maps')) {
+          const hasTraffic = this.map.map.getLayer('traffic');
+          if (hasTraffic) {
+            this.map.map.setLayoutProperty('traffic', 'visibility', 
+              this.map.map.getLayoutProperty('traffic', 'visibility') === 'visible' ? 'none' : 'visible'
+            );
+          }
+          this.showTacticalNotification('MAP DATA LAYERS TOGGLED');
+        } else if (text.includes('Share or Embed')) {
+          navigator.clipboard.writeText(window.location.href);
+          this.showTacticalNotification('TACTICAL LINK COPIED TO CLIPBOARD');
+        }
+      });
+    });
 
     document.getElementById('toggle-advanced')?.addEventListener('click', () => {
       const panel = document.getElementById('advanced-details');
@@ -590,7 +595,7 @@ class App {
     const directionsView = document.getElementById('directions-view');
     const navBottomBar = document.getElementById('nav-bottom-bar');
     const infoReadout = document.getElementById('info-readout');
-    const categoryBar = document.querySelector('.category-bar');
+    const dropdown = document.querySelector('.dropdown-container');
     const maneuverCard = document.getElementById('maneuver-card');
     const hazardFab = document.getElementById('hazard-fab');
 
@@ -598,7 +603,7 @@ class App {
     if (directionsView) directionsView.style.display = 'none';
     if (navBottomBar) navBottomBar.style.display = 'none';
     if (infoReadout) infoReadout.style.display = 'block';
-    if (categoryBar) categoryBar.classList.remove('hidden');
+    if (dropdown) dropdown.classList.remove('hidden');
     if (maneuverCard) maneuverCard.style.display = 'none';
     if (hazardFab) hazardFab.style.display = 'none';
 
@@ -722,12 +727,12 @@ class App {
     const dirView = document.getElementById('directions-view');
     const navBar = document.getElementById('nav-bottom-bar');
     const infoCard = document.getElementById('info-readout');
-    const catBar = document.querySelector('.category-bar');
+    const dropdown = document.querySelector('.dropdown-container');
 
     if (dirView) dirView.style.display = 'none';
     if (navBar) navBar.style.display = 'flex';
     if (infoCard) infoCard.style.display = 'none';
-    if (catBar) catBar.classList.add('hidden');
+    if (dropdown) dropdown.classList.add('hidden');
 
     this.navSystem.start(route, type);
     
@@ -824,27 +829,28 @@ class App {
       if (navBottomBar && navBottomBar.style.display === 'flex') {
         const speedMs = state.speed > 1 ? state.speed : 13.8; 
         const remainingSeconds = state.totalDistanceRemaining / speedMs;
-        document.getElementById('nav-eta-time')!.innerText = this.formatDuration(remainingSeconds);
-        document.getElementById('nav-distance')!.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
+        
+        const etaEl = document.getElementById('nav-eta-time');
+        const distEl = document.getElementById('nav-distance');
+        if (etaEl) etaEl.innerText = this.formatDuration(remainingSeconds);
+        if (distEl) distEl.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
 
         // Update Maneuver UI
-        const card = document.getElementById('maneuver-card')!;
-        if (state.isMoving) {
+        const card = document.getElementById('maneuver-card');
+        if (card && state.isMoving) {
           card.style.display = 'flex';
-          document.getElementById('maneuver-dist')!.innerText = `${Math.round(state.distanceToNext)} m`;
-          
-          // Start animation only when movement detected
-          if (this.map.visualEffects) {
-            this.map.visualEffects.startNavigationAnimation();
-          }
+          const maneuverDistEl = document.getElementById('maneuver-dist');
+          if (maneuverDistEl) maneuverDistEl.innerText = `${Math.round(state.distanceToNext)} m`;
 
           // Find current step from the active route
           const route = (this.navSystem as any).route; 
           if (route && route.steps) {
             const currentStep = route.steps[this.navSystem.currentStepIndex]; 
             if (currentStep) {
-              document.getElementById('maneuver-instruction')!.innerText = currentStep.maneuver.instruction;
-              document.getElementById('maneuver-icon')!.innerText = this.getManeuverIcon(currentStep.maneuver.type);
+              const instrEl = document.getElementById('maneuver-instruction');
+              const iconEl = document.getElementById('maneuver-icon');
+              if (instrEl) instrEl.innerText = currentStep.maneuver.instruction;
+              if (iconEl) iconEl.innerText = this.getManeuverIcon(currentStep.maneuver.type);
             }
           }
         }
@@ -862,13 +868,105 @@ class App {
     }, 20);
   }
 
-  private addAlertToFeed(update: IntelligenceUpdate) {
+  private getManeuverIcon(type: string): string {
+    const icons: Record<string, string> = {
+      'turn': '↗',
+      'sharp turn': '⤴',
+      'slight turn': '➚',
+      'straight': '↑',
+      'on ramp': '➘',
+      'off ramp': '➚',
+      'fork': '🍴',
+      'merger': ' merge',
+      'roundabout': '🔄',
+      'arrive': '🏁'
+    };
+    for (const key in icons) {
+      if (type.toLowerCase().includes(key)) return icons[key];
+    }
+    return '↑';
+  }
+
+  /** --------------------------------------------------------------
+   *  STRATEGIC INTELLIGENCE: Filter POIs
+   *  -------------------------------------------------------------- */
+  private async filterUrbanIntelligence(category: string) {
+    const center = this.map.map.getCenter();
+    
+    // Simulate tactical scanning
+    const statusText = document.getElementById('loader-status');
+    const startupLoader = document.getElementById('startup-loader');
+    if (startupLoader && statusText) {
+      startupLoader.style.display = 'flex';
+      startupLoader.style.background = 'rgba(0,0,0,0.4)';
+      statusText.innerText = `SCANNING SECTOR FOR: ${category.toUpperCase()}...`;
+      setTimeout(() => { startupLoader.style.display = 'none'; }, 1200);
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${category}.json?proximity=${center.lng},${center.lat}&access_token=${this.token}&limit=12`
+      );
+      const data = await response.json();
+
+      data.features.forEach((feature: any) => {
+        const [lng, lat] = feature.center;
+        this.map.addTacticalMarker({
+          id: feature.id,
+          type: category as any,
+          location: [lng, lat],
+          severity: 'info',
+          message: feature.text, // Updated to match interface
+          timestamp: Date.now()
+        });
+      });
+
+      if (data.features.length > 0) {
+        // Sort by distance from center
+        const sorted = data.features.map((f: any) => {
+          const [lng, lat] = f.center;
+          const dist = Math.sqrt(Math.pow(lng - center.lng, 2) + Math.pow(lat - center.lat, 2));
+          return { ...f, dist };
+        }).sort((a: any, b: any) => a.dist - b.dist);
+
+        const nearest = sorted[0];
+        const [nlng, nlat] = nearest.center;
+        
+        this.map.flyTo(nlng, nlat, 17.5);
+        this.showTacticalNotification(`NEAREST FOUND: ${nearest.text.toUpperCase()}`);
+      }
+    } catch (err) {
+      console.error('Tactical failure: POI scan failed', err);
+    }
+  }
+
+  private showTacticalNotification(message: string) {
     const feed = document.getElementById('intel-feed');
     if (!feed) return;
-    const alert = document.createElement('div');
-    alert.className = `glass-panel alert-item alert-${update.severity}`;
-    alert.innerHTML = `<strong>${update.type.toUpperCase()}</strong>: ${update.message}`;
-    feed.prepend(alert);
+    
+    const notification = document.createElement('div');
+    notification.className = 'glass-panel alert-item alert-info';
+    notification.style.animation = 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    notification.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="color:var(--primary-accent); font-weight:bold;">[ SYSTEM ]</span>
+        <span>${message}</span>
+      </div>
+    `;
+    
+    feed.prepend(notification);
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateY(-10px)';
+      setTimeout(() => notification.remove(), 400);
+    }, 4000);
+  }
+
+  private formatDuration(seconds: number): string {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins} min`;
   }
 
 }

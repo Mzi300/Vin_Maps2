@@ -17,6 +17,7 @@ export class VisualEffects {
   private destMarker: mapboxgl.Marker | null = null;
   private destination: [number, number] | null = null;
   private arrowOffset: number = 0;
+  private lastStableCoords: [number, number] = [0, 0];
   private renderer: any;
 
   constructor(map: any, renderer?: any) {
@@ -238,8 +239,13 @@ export class VisualEffects {
     if (this.threeVehicleLayer) {
       try {
         if (this.map.getLayer('3d-vehicle-layer')) {
-          this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
-          this.threeVehicleLayer.updatePosition(coords, heading);
+          // Strict motion gating: only update if moving > 1.0m/s or moved > 2.5m
+          const dist = this.calculateDistance(this.lastStableCoords, coords);
+          if (dist > 2.5) { 
+            this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
+            this.threeVehicleLayer.updatePosition(coords, heading);
+            this.lastStableCoords = [...coords];
+          }
         }
       } catch (e) {
         console.warn('[VisualEffects] Error updating 3D vehicle:', e);
@@ -474,50 +480,8 @@ export class VisualEffects {
 
 
   private animateTraffic = () => {
-    try {
-      if (!this.map || !this.routeCoords || this.routeCoords.length < 2) return;
-
-      if (this.currentSegmentIndex >= this.routeCoords.length - 1) {
-        this.currentSegmentIndex = 0;
-        this.segmentProgress = 0;
-      }
-
-      const startNode = this.routeCoords[this.currentSegmentIndex];
-      const endNode = this.routeCoords[this.currentSegmentIndex + 1];
-
-      if (!startNode || !endNode) return;
-
-      this.segmentProgress += 0.005;
-
-      if (this.segmentProgress >= 1) {
-        this.segmentProgress = 0;
-        this.currentSegmentIndex++;
-        if (this.currentSegmentIndex >= this.routeCoords.length - 1) {
-          this.currentSegmentIndex = 0;
-        }
-      } else {
-        this.trafficPointCoords[0] = startNode[0] + (endNode[0] - startNode[0]) * this.segmentProgress;
-        this.trafficPointCoords[1] = startNode[1] + (endNode[1] - startNode[1]) * this.segmentProgress;
-      }
-
-      const dx = endNode[0] - startNode[0];
-      const dy = endNode[1] - startNode[1];
-      const bearing = (Math.atan2(dx, dy) * 180) / Math.PI;
-
-      if (this.threeVehicleLayer) {
-        this.threeVehicleLayer.updatePosition(this.trafficPointCoords, bearing);
-      }
-
-      // Update camera if in simulation/demo mode
-      if (this.renderer) {
-        this.renderer.updateCameraForNav(this.trafficPointCoords, bearing, 13.8); 
-      }
-
-      this.animationId = requestAnimationFrame(this.animateTraffic);
-    } catch (err) {
-      console.warn('[VisualEffects] Animation loop error:', err);
-      if (this.animationId) cancelAnimationFrame(this.animationId);
-    }
+    // Automated simulation loop disabled to prioritize live movement data.
+    // Icon updates are now exclusively handled by updateUserVehicle().
   }
 
   /**
