@@ -85,9 +85,9 @@ export class VisualEffects {
           'line-cap': 'round'
         },
         paint: {
-          'line-color': '#32CD32', // Clear Lime Green
-          'line-width': 12,
-          'line-opacity': 0.9,
+          'line-color': '#32CD32', // Ultra-bright Lime
+          'line-width': 10,        // Sharp core
+          'line-opacity': 1,
           'line-blur': 0
         },
         slot: 'top'
@@ -98,7 +98,7 @@ export class VisualEffects {
       } catch (e) {}
 
 
-      // Outer glow layer
+      // Outer glow layer (Tactical Neon Flare)
       this.map.addLayer({
         id: 'neon-route-glow',
         type: 'line',
@@ -108,10 +108,10 @@ export class VisualEffects {
           'line-cap': 'round'
         },
         paint: {
-          'line-color': '#ffffff', // Thin white border/glow
-          'line-width': 16,
-          'line-blur': 1,
-          'line-opacity': 0.3
+          'line-color': '#32CD32', // Lime Glow
+          'line-width': 22,        // Wide flare
+          'line-blur': 12,         // High-res soft blur
+          'line-opacity': 0.4
         },
         slot: 'top'
       }, 'neon-route-core');
