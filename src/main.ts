@@ -461,6 +461,8 @@ class App {
     this.navSystem.start(route, TRANSPORT_PROFILES[this.currentTransportType].mapboxProfile);
     
     document.getElementById('maneuver-card')!.style.display = 'flex';
+    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
+    document.getElementById('recenter-btn')!.style.display = 'flex';
     
     // HIDE TOP UI: Remove search/directions during active nav
     const topControls = document.querySelector('.top-controls') as HTMLElement;
@@ -504,6 +506,10 @@ class App {
     this.map.visualEffects.clearRoute();
     
     document.getElementById('search-view')!.style.display = 'flex';
+    document.getElementById('nav-bottom-bar')!.style.display = 'none';
+    document.getElementById('recenter-btn')!.style.display = 'none';
+    document.getElementById('maneuver-card')!.style.display = 'none';
+    document.getElementById('hazard-fab')!.style.display = 'none';
     
     // RESTORE TOP UI: Show search again
     const topControls = document.querySelector('.top-controls') as HTMLElement;
