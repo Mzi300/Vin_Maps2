@@ -577,31 +577,39 @@ body {
 }
 
 .nav-main-eta {
-  font-size: 1.4rem;
-  font-weight: 800;
-  color: var(--success);
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #47ffb3; /* Brightest Success Green */
+  line-height: 1.1;
+  text-shadow: 0 0 10px rgba(71, 255, 179, 0.3);
 }
 
 .nav-sub-info {
-  font-size: 0.9rem;
-  color: var(--text-dim);
+  font-size: 1rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  letter-spacing: 0.5px;
 }
 
 .exit-nav-btn {
-  background: var(--danger);
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 20px;
-  font-weight: bold;
+  background: rgba(255, 77, 77, 0.2);
+  color: #ff4d4d;
+  border: 1px solid #ff4d4d;
+  padding: 0.8rem 1.8rem;
+  border-radius: 30px;
+  font-weight: 900;
+  font-size: 0.85rem;
+  letter-spacing: 1px;
   cursor: pointer;
-  transition: all 0.2s;
-  margin-left: 20px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  margin-left: 30px;
 }
 
 .exit-nav-btn:hover {
+  background: #ff4d4d;
+  color: white;
   transform: scale(1.05);
-  box-shadow: 0 0 15px rgba(255, 77, 77, 0.4);
+  box-shadow: 0 0 20px rgba(255, 77, 77, 0.4);
 }
 
 .category-bar.hidden {

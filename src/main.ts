@@ -137,14 +137,14 @@ class App {
                 </div>
               </div>
 
-              <div id="nav-bottom-bar" class="gta-hud-pill nav-bar-minimal" style="display: none;">
+              <div id="nav-bottom-bar" class="nav-bar-minimal glass-panel" style="display: none;">
                 <div class="nav-info-group">
-                  <span id="nav-eta-time" class="nav-main-eta">--</span>
+                  <span id="nav-eta-time" class="nav-main-eta">CALCULATING...</span>
                   <div class="nav-sub-info">
-                    <span id="nav-distance">--</span> • <span id="nav-arrival">--</span>
+                    <span id="nav-distance">0.0 km</span> • <span id="nav-arrival">--:--</span>
                   </div>
                 </div>
-                <button id="exit-nav" class="exit-nav-btn">EXIT</button>
+                <button id="exit-nav" class="exit-nav-btn">EXIT NAV</button>
               </div>
             </div>
           </div>
@@ -525,8 +525,15 @@ class App {
         
         const etaEl = document.getElementById('nav-eta-time');
         const distEl = document.getElementById('nav-distance');
+        const arrivalEl = document.getElementById('nav-arrival');
+        
         if (etaEl) etaEl.innerText = this.formatDuration(remainingSeconds);
         if (distEl) distEl.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
+        
+        if (arrivalEl) {
+          const arrivalTime = new Date(Date.now() + remainingSeconds * 1000);
+          arrivalEl.innerText = arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
 
         const card = document.getElementById('maneuver-card');
         if (card && state.isMoving) {
