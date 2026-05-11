@@ -207,7 +207,7 @@ class App {
         this.currentOriginCoords = coords;
         
         // IMMEDIATE FLY: Move to user's real coordinates on launch
-        this.map.flyTo(coords[0], coords[1], 16.5); 
+        this.map.flyTo(coords[0], coords[1], 18.2); // Tighter zoom for street visibility
         
         // Update camera controller with initial position
         if (this.map.cameraController) {

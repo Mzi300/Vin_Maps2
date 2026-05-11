@@ -1,7 +1,7 @@
 // import type { Map } from 'mapbox-gl';
 
 export class GeolocationService {
-  private defaultLocation: [number, number] = [28.0473, -26.2041]; // Johannesburg CBD
+  private defaultLocation: [number, number] = [28.0163, -26.2307]; // Boswell Avenue, Mondeor
 
   constructor(_map: any) {}
 
