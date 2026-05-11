@@ -322,16 +322,24 @@ class App {
     const dropdownToggle = document.getElementById('poi-dropdown-toggle');
     const dropdownMenu = document.getElementById('poi-dropdown-menu');
 
-    dropdownToggle?.addEventListener('click', () => {
-      dropdownMenu?.classList.toggle('show');
+    dropdownToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu?.classList.toggle('active');
       dropdownToggle.classList.toggle('active');
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', () => {
+      dropdownMenu?.classList.remove('active');
+      dropdownToggle?.classList.remove('active');
     });
 
     document.querySelectorAll('[data-poi]').forEach(btn => {
       btn.addEventListener('click', (e) => {
+        e.stopPropagation();
         const cat = (e.currentTarget as HTMLElement).dataset.poi!;
         this.filterUrbanIntelligence(cat);
-        dropdownMenu?.classList.remove('show');
+        dropdownMenu?.classList.remove('active');
         dropdownToggle?.classList.remove('active');
       });
     });

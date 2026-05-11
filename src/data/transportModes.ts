@@ -1,4 +1,4 @@
-export type TransportType = 'car' | 'truck' | 'van' | 'bus' | 'motorcycle' | 'bicycle' | 'pedestrian' | 'train';
+export type TransportType = 'car' | 'truck' | 'van' | 'bus' | 'motorcycle' | 'bicycle' | 'pedestrian';
 
 export interface TransportProfile {
   type: TransportType;
@@ -15,6 +15,5 @@ export const TRANSPORT_PROFILES: Record<TransportType, TransportProfile> = {
   bus: { type: 'bus', icon: '🚌', speedMultiplier: 0.6, riskFactor: 0.1, mapboxProfile: 'driving' },
   motorcycle: { type: 'motorcycle', icon: '🏍️', speedMultiplier: 1.3, riskFactor: 0.4, mapboxProfile: 'driving' },
   bicycle: { type: 'bicycle', icon: '🚲', speedMultiplier: 0.3, riskFactor: 0.5, mapboxProfile: 'cycling' },
-  pedestrian: { type: 'pedestrian', icon: '🚶', speedMultiplier: 0.1, riskFactor: 0.2, mapboxProfile: 'walking' },
-  train: { type: 'train', icon: '🚆', speedMultiplier: 1.5, riskFactor: 0.05, mapboxProfile: 'driving' }
+  pedestrian: { type: 'pedestrian', icon: '🚶', speedMultiplier: 0.1, riskFactor: 0.2, mapboxProfile: 'walking' }
 };
