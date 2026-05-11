@@ -225,7 +225,7 @@ export class MapRenderer {
    *  Camera flight helpers
    *  -------------------------------------------------------------- */
   public flyTo(lng: number, lat: number, zoom: number = 18.5) {
-    this.stopRotation();
+
     // Locked
     this.map.flyTo({
       center: [lng, lat],
@@ -245,7 +245,7 @@ export class MapRenderer {
     destination: [number, number],
     routeCoords?: [number, number][]
   ) {
-    this.stopRotation();
+
 
     if (this.visualEffects) {
       this.visualEffects.drawGlowingRoute(origin, destination, routeCoords);
@@ -267,7 +267,7 @@ export class MapRenderer {
     }
 
     // Locked
-    this.stopRotation();
+
     
     // 2. Immediate Focus: Fly to origin facing the correct direction
     this.map.flyTo({
@@ -316,7 +316,7 @@ export class MapRenderer {
    *  -------------------------------------------------------------- */
   public enterNavigationMode() {
     this.isNavigationMode = true;
-    this.stopRotation();
+
     if (this.cameraController) {
       this.cameraController.setMode(CameraMode.DRIVING);
     }
