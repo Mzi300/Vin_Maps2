@@ -207,10 +207,13 @@ class App {
         this.currentOriginCoords = coords;
         this.map.flyTo(coords[0], coords[1], 15.5); 
         
+        // Force the icon to show at the start
         if (this.map.visualEffects) {
+          this.map.visualEffects.updateUserVehicle(coords, 0);
           (this.map.visualEffects as any).updateUserLocationGlow(coords);
         }
 
+        this.navSystem.snapToPosition(coords, 0);
         this.navSystem.startTracking();
         this.map.enterNavigationMode();
         this.setupNavigationStateListener();
