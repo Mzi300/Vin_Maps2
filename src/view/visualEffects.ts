@@ -6,11 +6,8 @@ import { ThreeVehicleLayer } from './threeVehicleLayer';
 export class VisualEffects {
   private map: Map;
   private animationId: number | null = null;
-  private trafficPointCoords: [number, number] = [0, 0];
   private routeCoords: [number, number][] = [];
   private vehicleMarker: mapboxgl.Marker | null = null;
-  private currentSegmentIndex: number = 0;
-  private segmentProgress: number = 0;
   private isWeatherActive: boolean = false;
   private threeVehicleLayer!: ThreeVehicleLayer;
   private userLocationMarker: mapboxgl.Marker | null = null;
@@ -185,9 +182,7 @@ export class VisualEffects {
   public setVehicleAtStart() {
     if (this.routeCoords.length < 2) return;
     
-    this.currentSegmentIndex = 0;
-    this.segmentProgress = 0;
-    this.trafficPointCoords = [...this.routeCoords[0]] as [number, number];
+    const startCoords = [...this.routeCoords[0]] as [number, number];
 
     if (!this.map.getLayer('3d-vehicle-layer')) {
       this.threeVehicleLayer = new ThreeVehicleLayer(this.map);
@@ -208,7 +203,7 @@ export class VisualEffects {
     const bearing = (Math.atan2(dx, dy) * 180) / Math.PI;
 
     if (this.threeVehicleLayer) {
-      this.threeVehicleLayer.updatePosition(this.trafficPointCoords, bearing);
+      this.threeVehicleLayer.updatePosition(startCoords, bearing);
     }
     
     if (this.animationId) {
@@ -220,11 +215,6 @@ export class VisualEffects {
 
   public recenter() {
     // Logic moved to NavigationCameraController via MapRenderer
-  }
-
-  public startNavigationAnimation() {
-    if (this.animationId) return;
-    this.animateTraffic();
   }
 
   public updateUserVehicle(coords: [number, number], heading: number) {
@@ -479,10 +469,7 @@ export class VisualEffects {
 
 
 
-  private animateTraffic = () => {
-    // Automated simulation loop disabled to prioritize live movement data.
-    // Icon updates are now exclusively handled by updateUserVehicle().
-  }
+
 
   /**
    * 4. Weather & Atmosphere Integration

@@ -16,7 +16,6 @@ node_modules/
 # =========================
 # BUILD OUTPUTS
 # =========================
-dist/
 dist-ssr/
 build/
 out/
