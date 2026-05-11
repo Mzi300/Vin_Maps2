@@ -85,9 +85,9 @@ export class VisualEffects {
           'line-cap': 'round'
         },
         paint: {
-          'line-color': '#4285F4', // Google Maps Blue
-          'line-width': 14,
-          'line-opacity': 1,
+          'line-color': '#32CD32', // Clear Lime Green
+          'line-width': 12,
+          'line-opacity': 0.9,
           'line-blur': 0
         },
         slot: 'top'
@@ -116,46 +116,7 @@ export class VisualEffects {
         slot: 'top'
       }, 'neon-route-core');
 
-      // 3. Directional Arrows (Moving Pattern)
-      this.map.addLayer({
-        id: 'neon-route-arrows',
-        type: 'line',
-        source: 'neon-route-source',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 4,
-          'line-dasharray': [2, 4],
-          'line-opacity': 0.8
-        },
-        slot: 'top'
-      });
-
-      this.animateArrows();
-
-      // 4. X-Ray Symbol Route (Always on top of buildings)
-      this.map.addLayer({
-        id: 'neon-route-symbols',
-        type: 'symbol',
-        source: 'neon-route-source',
-        layout: {
-          'symbol-placement': 'line',
-          'symbol-spacing': 80,
-          'icon-image': 'rocket-15',
-          'icon-size': 1.2,
-          'icon-rotate': 90,
-          'icon-rotation-alignment': 'map',
-          'icon-allow-overlap': true
-        },
-        paint: {
-          'icon-opacity': 0.9,
-          'icon-color': '#ffffff'
-        },
-        slot: 'top'
-      });
+      // Directional Arrows and Symbols removed for cleaner solid line
     }
 
     // Add Destination Marker (Neon Pulse)
