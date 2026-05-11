@@ -462,6 +462,10 @@ class App {
     
     document.getElementById('maneuver-card')!.style.display = 'flex';
     
+    // HIDE TOP UI: Remove search/directions during active nav
+    const topControls = document.querySelector('.top-controls') as HTMLElement;
+    if (topControls) topControls.style.display = 'none';
+    
     if (this.map.visualEffects) {
       this.map.visualEffects.setNavigating(true);
     }
@@ -500,6 +504,10 @@ class App {
     this.map.visualEffects.clearRoute();
     
     document.getElementById('search-view')!.style.display = 'flex';
+    
+    // RESTORE TOP UI: Show search again
+    const topControls = document.querySelector('.top-controls') as HTMLElement;
+    if (topControls) topControls.style.display = 'flex';
     
     if (this.map.visualEffects) {
       this.map.visualEffects.setNavigating(false);
