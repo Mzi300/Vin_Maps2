@@ -225,9 +225,9 @@ export class VisualEffects {
             return;
           }
 
-          // Strict motion gating: only update if moved > 2.5m
+          // Less strict motion gating: only update if moved > 0.5m
           const dist = this.calculateDistance(this.lastStableCoords, coords);
-          if (dist > 2.5) { 
+          if (dist > 0.5) { 
             this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
             this.threeVehicleLayer.updatePosition(coords, heading);
             this.lastStableCoords = [...coords];

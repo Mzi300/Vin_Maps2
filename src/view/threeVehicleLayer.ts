@@ -119,11 +119,10 @@ export class ThreeVehicleLayer {
 
     // Create transformation matrix for vehicle rendering
     const scale = mercatorCoord.meterInMercatorCoordinateUnits();
-    const bearingRad = THREE.MathUtils.degToRad(this.currentBearing);
     
     // Rotation around Z axis (up) to align vehicle forward direction with heading
-    // Rotation around Z axis (up) to align vehicle forward direction with heading
-    const rotationZ = new THREE.Matrix4().makeRotationZ(-bearingRad);
+    // Removed rotationZ from here because it's already applied to the vehicle mesh in updatePosition
+    // to prevent double rotation.
     
     // Translation to map position
     const translation = new THREE.Matrix4().makeTranslation(mercatorCoord.x, mercatorCoord.y, mercatorCoord.z);
@@ -131,8 +130,8 @@ export class ThreeVehicleLayer {
     // Uniform scaling (no Y inversion) to keep vehicle upright
     const scaleM = new THREE.Matrix4().makeScale(scale, scale, scale);
     
-    // Combine: translate -> rotate -> scale
-    const modelMatrix = translation.multiply(rotationZ).multiply(scaleM);
+    // Combine: translate -> scale
+    const modelMatrix = translation.multiply(scaleM);
     
     const m = new THREE.Matrix4().fromArray(matrix);
     this.camera.projectionMatrix = m.multiply(modelMatrix);

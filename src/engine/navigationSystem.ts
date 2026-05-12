@@ -122,8 +122,8 @@ export class NavigationSystem {
 
     // 2. Dead-Zone Logic (Stationary Lock)
     // If movement is negligible and speed is low, assume stationary to avoid jitter
-    // We use a strict threshold (5.0m) to keep the icon rock-solid
-    if (rawDist < 5.0 && rawSpeed < this.speedThreshold) {
+    // We use a strict threshold (2.0m) to keep the icon rock-solid but responsive
+    if (rawDist < 2.0 && rawSpeed < this.speedThreshold) {
       this.currentState.isMoving = false;
       this.currentState.speed = 0;
       this.lastPosition = newPos; // Sync to stop future jumps
@@ -158,7 +158,7 @@ export class NavigationSystem {
     if (!this.hasDetectedMotion) {
       const distFromStart = this.calculateDistance(this.currentState.currentPosition, smoothedPos);
       // Require either decent speed or significant distance to "unlock" the vehicle
-      if (smoothedSpeed > 1.0 || distFromStart > 5.0) {
+      if (smoothedSpeed > 0.5 || distFromStart > 2.0) {
         this.hasDetectedMotion = true;
         console.log('[NavigationSystem] Motion detected - Unlocking vehicle icon.');
       } else {
@@ -180,7 +180,11 @@ export class NavigationSystem {
     // If we have a route, snap the currentPosition to the nearest point on the route
     if (this.route && this.route.coordinates.length >= 2) {
       const snapped = this.snapToRoute(smoothedPos);
-      this.currentState.currentPosition = snapped;
+      this.currentState.currentPosition = snapped.point;
+      if (snapped.heading !== null && smoothedSpeed > 0.5) {
+        heading = snapped.heading;
+        this.currentState.heading = heading;
+      }
     }
 
     // 8. Maneuver & Step Tracking
@@ -317,11 +321,12 @@ export class NavigationSystem {
     }
   }
 
-  private snapToRoute(pos: [number, number]): [number, number] {
-    if (!this.route) return pos;
+  private snapToRoute(pos: [number, number]): { point: [number, number], heading: number | null } {
+    if (!this.route) return { point: pos, heading: null };
 
     let minDistance = Infinity;
     let snappedPoint = pos;
+    let snappedHeading: number | null = null;
 
     for (let i = 0; i < this.route.coordinates.length - 1; i++) {
       const p1 = this.route.coordinates[i];
@@ -332,12 +337,13 @@ export class NavigationSystem {
       if (dist < minDistance) {
         minDistance = dist;
         snappedPoint = projected;
+        snappedHeading = (Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180) / Math.PI;
       }
     }
 
     // Only snap if we are reasonably close to the road (e.g., < 40m)
     // If further away, let the off-route logic handle recalculation
-    return minDistance < 40 ? snappedPoint : pos;
+    return minDistance < 40 ? { point: snappedPoint, heading: snappedHeading } : { point: pos, heading: null };
   }
 
   private projectPointOnSegment(p: [number, number], a: [number, number], b: [number, number]): [number, number] {
