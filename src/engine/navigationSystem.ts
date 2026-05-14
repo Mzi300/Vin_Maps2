@@ -1,3 +1,4 @@
+import { intelligence } from './intelligenceManager';
 import type { OptimizedRoute } from './routeOptimizer';
 import { systemMonitor } from './systemMonitor';
 
@@ -33,6 +34,22 @@ export class RealtimeService {
       coords[0] + (Math.random() - 0.5) * offset,
       coords[1] + (Math.random() - 0.5) * offset
     ];
+  }
+
+  public reportHazard(type: string, location: [number, number]) {
+    if (this.socket) {
+      this.socket.emit('hazard_report', { type, location });
+    }
+  }
+
+  public triggerSOS(location: [number, number]) {
+    if (this.socket) {
+      this.socket.emit('sos_trigger', { location });
+    }
+  }
+
+  private initSocket() {
+    // Placeholder for socket init
   }
 }
 
@@ -430,6 +447,25 @@ export class NavigationSystem {
     let dot = atop[0] * atob[0] + atop[1] * atob[1];
     const t = Math.min(1, Math.max(0, dot / len));
     return [a[0] + atob[0] * t, a[1] + atob[1] * t];
+  }
+
+  private findNearestPointOnRoute(pos: [number, number]): { point: [number, number], index: number } {
+    let minDistance = Infinity;
+    let nearestPoint = pos;
+    let nearestIndex = 0;
+
+    if (!this.route) return { point: pos, index: 0 };
+
+    for (let i = 0; i < this.route.coordinates.length; i++) {
+      const p = this.route.coordinates[i];
+      const d = this.calculateDistance(pos, p);
+      if (d < minDistance) {
+        minDistance = d;
+        nearestPoint = p;
+        nearestIndex = i;
+      }
+    }
+    return { point: nearestPoint, index: nearestIndex };
   }
 
   private checkProximityHazards(pos: [number, number]) {

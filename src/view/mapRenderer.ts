@@ -13,6 +13,7 @@ export class MapRenderer {
   private resolveStyleLoaded!: () => void;
   private isNavigationMode: boolean = false;
 
+  private styleLoaded: boolean = false;
   private initialCenter: [number, number] = [28.0473, -26.2041];
 
   constructor(containerId: string, token: string, center?: [number, number]) {
