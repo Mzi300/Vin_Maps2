@@ -35,6 +35,7 @@ class App {
   private tripTotalDistance: number = 0;
   private geocodingAbortController: AbortController | null = null;
   private routingAbortController: AbortController | null = null;
+  private isPanicMode: boolean = true;
 
   constructor() {
     this.renderUIShell();
@@ -735,7 +736,7 @@ class App {
       // 4. Automatic Rerouting
       this.navSystem.onOffRoute = () => {
         if (!this.tripStartTime) return; // Only during active trip
-        this.showTacticalNotification('MISSION DEVIATION DETECTED - CALCULATING REROUTE', 'warning');
+        this.showTacticalNotification('MISSION DEVIATION DETECTED - CALCULATING REROUTE');
         this.finalizeRouting(this.currentTransportType);
       };
 
@@ -798,53 +799,6 @@ class App {
     return '↑';
   }
 
-  private async filterUrbanIntelligence(category: string) {
-    const center = this.map.map.getCenter();
-    
-    const statusText = document.getElementById('loader-status');
-    const startupLoader = document.getElementById('startup-loader');
-    if (startupLoader && statusText) {
-      startupLoader.style.display = 'flex';
-      startupLoader.style.background = 'rgba(0,0,0,0.4)';
-      statusText.innerText = `SCANNING SECTOR FOR: ${category.toUpperCase()}...`;
-      setTimeout(() => { startupLoader.style.display = 'none'; }, 1200);
-    }
-
-    try {
-      const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${category}.json?proximity=${center.lng},${center.lat}&access_token=${this.token}&limit=12`
-      );
-      const data = await response.json();
-
-      if (data.features && data.features.length > 0) {
-        data.features.forEach((feature: any) => {
-          const [lng, lat] = feature.center;
-          this.map.addTacticalMarker({
-            id: feature.id,
-            type: category as any,
-            location: [lng, lat],
-            severity: 'info',
-            message: feature.text,
-            timestamp: Date.now()
-          });
-        });
-
-        const sorted = data.features.map((f: any) => {
-          const [lng, lat] = f.center;
-          const dist = Math.sqrt(Math.pow(lng - center.lng, 2) + Math.pow(lat - center.lat, 2));
-          return { ...f, dist };
-        }).sort((a: any, b: any) => a.dist - b.dist);
-
-        const nearest = sorted[0];
-        const [nlng, nlat] = nearest.center;
-        
-        this.map.flyTo(nlng, nlat, 17.5);
-        this.showTacticalNotification(`NEAREST FOUND: ${nearest.text.toUpperCase()}`);
-      }
-    } catch (err) {
-      console.error('Tactical failure: POI scan failed', err);
-    }
-  }
 
   private async findNearestEmergencyPOI() {
     if (!this.currentOriginCoords) return;
@@ -860,12 +814,12 @@ class App {
     this.finalizeRouting('car');
   }
 
-  public showTacticalNotification(message: string) {
+  public showTacticalNotification(message: string, severity: 'info' | 'warning' | 'critical' = 'info') {
     const feed = document.getElementById('intel-feed');
     if (!feed) return;
     
     const notification = document.createElement('div');
-    notification.className = 'glass-panel alert-item alert-info';
+    notification.className = `glass-panel alert-item alert-${severity}`;
     notification.style.animation = 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
     notification.innerHTML = `
       <div style="display:flex; align-items:center; gap:10px;">

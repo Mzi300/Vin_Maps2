@@ -7,6 +7,7 @@ import { NavigationCameraController, CameraMode } from './navigationCameraContro
 export class MapRenderer {
   private containerId: string;
   public map!: mapboxgl.Map;
+  public visualEffects!: VisualEffects;
   public cameraController!: NavigationCameraController;
   private isNavigationMode: boolean = false;
   private styleLoaded: boolean = false;
