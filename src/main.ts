@@ -1,0 +1,893 @@
+import { MapRenderer } from './view/mapRenderer';
+import { intelligence } from './engine/intelligenceManager';
+import { TRANSPORT_PROFILES } from './data/transportModes';
+import type { TransportType } from './data/transportModes';
+import { GeolocationService } from './engine/geolocationService';
+import { RouteOptimizer } from './engine/routeOptimizer';
+import type { OptimizedRoute } from './engine/routeOptimizer';
+import { NavigationSystem } from './engine/navigationSystem';
+import { LocationCache } from './engine/persistence';
+import { realtime } from './engine/realtimeService';
+import { systemMonitor } from './engine/systemMonitor';
+import { SensorIntelligence } from './engine/sensorIntelligence';
+import './style/index.css';
+
+window.addEventListener('error', (e) => {
+  const root = document.querySelector<HTMLDivElement>('#app');
+  if (root) {
+    const errorBox = document.createElement('div');
+    errorBox.style.cssText = 'position:fixed; top:0; left:0; background:red; color:white; z-index:9999; padding:10px; font-family:monospace;';
+    errorBox.innerText = `CRITICAL ERROR: ${e.message} at ${e.filename}:${e.lineno}`;
+    root.appendChild(errorBox);
+  }
+});
+
+class App {
+  private map!: MapRenderer;
+  private token: string | null = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibXppa2F5aXNlMDEiLCJhIjoiY21vczd4ajc4MDA5ODJ3c2R3NDV2dHI0NSJ9.gbvq-aQiEttYKka8u4qmqg';
+  private routeOptimizer!: RouteOptimizer;
+  private currentOriginCoords: [number, number] | null = null;
+  private currentDestCoords: [number, number] | null = null;
+  public visualEffects!: any;
+  private navSystem!: NavigationSystem;
+  private currentTransportType: TransportType = 'car';
+  private tripStartTime: number = 0;
+  private tripTotalDistance: number = 0;
+  private geocodingAbortController: AbortController | null = null;
+  private routingAbortController: AbortController | null = null;
+
+  constructor() {
+    this.renderUIShell();
+    // Defer heavy systems to achieve <1s UI visibility
+    setTimeout(() => this.initHeavySystems(), 10);
+  }
+
+  private renderUIShell() {
+    const root = document.querySelector<HTMLDivElement>('#app')!;
+    const cached = LocationCache.get();
+    const lastAddress = cached ? 'Last known sector' : 'Search South Africa...';
+
+    root.innerHTML = `
+      <div class="scanline"></div>
+      <div id="cinematic-container">
+        <div id="map-container"></div>
+        
+        <div id="sidebar" class="glass-panel sidebar-panel">
+          <div class="sidebar-header">
+            <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
+            <button id="close-sidebar" class="close-btn">×</button>
+          </div>
+          <div class="sidebar-content">
+            <div class="sidebar-section">
+              <button class="sidebar-item">⭐ Saved Sectors</button>
+              <button class="sidebar-item">🕒 Recent Missions</button>
+              <button class="sidebar-item">✍️ Contributions</button>
+            </div>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section">
+              <button id="toggle-stealth" class="sidebar-item">🛡️ Tactical Stealth Mode: OFF</button>
+              <button class="sidebar-item">📈 Your Timeline</button>
+              <button class="sidebar-item">🛡️ Data in Maps</button>
+              <button class="sidebar-item">🔗 Share or Embed</button>
+            </div>
+            <div class="sidebar-divider"></div>
+            <div class="sidebar-section system-health">
+              <h3 class="tactical-subtitle">SYSTEM HEALTH</h3>
+              <div class="health-item">
+                <span>TACTICAL LINK</span>
+                <span id="health-link" class="status-indicator offline">OFFLINE</span>
+              </div>
+              <div class="health-item">
+                <span>GPS PRECISION</span>
+                <span id="health-gps" class="status-indicator">-- m</span>
+              </div>
+              <div class="health-item">
+                <span>LATENCY</span>
+                <span id="health-latency" class="status-indicator">-- ms</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="ui-overlay">
+          <!-- TOP HUD: Cinematic Maneuvers -->
+          <div id="maneuver-card" class="gta-hud-card maneuver-card" style="display: none;">
+            <div class="maneuver-icon" id="maneuver-icon">↑</div>
+            <div class="maneuver-text">
+              <div id="compass-readout" class="compass-readout">HEADING: NORTH</div>
+              <span id="maneuver-instruction" class="instruction-main">Follow route</span>
+              <span id="maneuver-dist" class="instruction-sub">0 m</span>
+            </div>
+          </div>
+
+          <div class="top-controls">
+            <div id="routing-engine" class="gta-hud-card command-bar search-state">
+              <div id="search-view" class="search-section">
+                <div class="input-group" style="width: 100%;">
+                  <button id="open-sidebar" class="menu-btn" style="margin-right: 5px;">☰</button>
+                  <input type="text" class="search-input" placeholder="${lastAddress}" id="dest-input" autocomplete="off" style="flex: 1;">
+                  <button id="locate-me" class="menu-btn" style="font-size: 1.1rem; padding: 0 5px;" title="My Location">📍</button>
+                  <button id="lock-dest" class="tactical-btn" style="padding: 0.4rem; font-size: 0.9rem;" title="Directions">↱</button>
+                </div>
+                <div id="suggestions-list" class="glass-panel suggestions-panel" style="display: none;"></div>
+              </div>
+
+              <div id="directions-view" class="directions-section" style="display: none; flex-direction: column; align-items: stretch; gap: 0.8rem;">
+                <div style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                  <button id="close-directions" class="menu-btn" style="font-size: 1.2rem; padding: 0;">←</button>
+                  <div class="transport-strip" id="transport-step" style="gap: 0.2rem;">
+                    ${Object.values(TRANSPORT_PROFILES).map(p => `
+                      <button class="transport-tab" data-type="${p.type}" title="${p.type.toUpperCase()}">
+                        <span class="tab-icon">${p.icon}</span>
+                        <span class="tab-time">--m</span>
+                      </button>
+                    `).join('')}
+                  </div>
+                </div>
+                <div class="route-inputs" style="width: 100%;">
+                  <div class="input-group mini" style="position: relative;">
+                    <span class="dot origin"></span>
+                    <input type="text" class="mini-input" id="origin-input" placeholder="Starting point..." autocomplete="off">
+                    <button id="locate-origin" class="mini-gps-btn" title="Use current location">📍</button>
+                    <div id="origin-suggestions" class="glass-panel suggestions-panel mini-sugg" style="display: none;"></div>
+                  </div>
+                  <div class="input-group mini">
+                    <span class="dot dest"></span>
+                    <input type="text" class="mini-input" id="final-dest-display" readonly>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BOTTOM HUD: GTA Style Stats -->
+          <div class="bottom-hud-container">
+            <div class="gta-stats-panel">
+              <div class="glass-panel dropdown-container">
+                <button id="poi-dropdown-toggle" class="cat-btn dropdown-toggle">
+                  🔍 Explore Intel <span class="arrow">▼</span>
+                </button>
+                <div id="poi-dropdown-menu" class="glass-panel dropdown-menu">
+                  <div class="dropdown-section">
+                    <label>VIMAPS INTEL</label>
+                    <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
+                    <button class="cat-btn" data-poi="police">🛡️ Security</button>
+                    <button class="cat-btn" data-poi="bank">🏦 Financial</button>
+                    <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
+                    <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
+                  </div>
+                </div>
+              </div>
+
+              <div id="nav-bottom-bar" class="nav-bar-minimal glass-panel" style="display: none;">
+                <div class="nav-info-group">
+                  <span id="nav-eta-time" class="nav-main-eta">CALCULATING...</span>
+                  <div class="nav-info">
+                    <span id="nav-eta-time">-- min</span>
+                    <span id="nav-dist-left">-- km</span>
+                    <div id="safety-badge" class="safety-badge">
+                      🛡️ TSI: --
+                    </div>
+                  </div>
+                </div>
+                <button id="exit-nav" class="exit-nav-btn">EXIT NAV</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Floating Controls -->
+          <div class="floating-controls">
+            <button id="recenter-btn" class="gta-hud-circle recenter-btn" style="display: none;" title="Re-center">🎯</button>
+            <button id="weather-toggle" class="gta-hud-circle weather-toggle-btn" title="Toggle Weather">⛅</button>
+          </div>
+
+          <!-- Hazard Reporting FAB -->
+          <div id="hazard-fab" class="hazard-fab" style="display: none;">
+            <button class="hazard-btn pothole" onclick="app.reportHazard('pothole')">🕳️</button>
+            <button class="hazard-btn accident" onclick="app.reportHazard('accident')">💥</button>
+            <button class="hazard-btn roadblock" onclick="app.reportHazard('roadblock')">🚧</button>
+          </div>
+
+          <!-- SOS / Panic Button -->
+          <div class="sos-fab-container">
+            <button id="sos-btn" class="sos-btn">SOS</button>
+          </div>
+
+          <!-- Trip Summary Modal -->
+          <div id="summary-modal" class="glass-panel summary-modal" style="display: none;">
+            <h2 class="tactical-title">MISSION DEBRIEF</h2>
+            <div class="summary-grid">
+              <div class="summary-item"><label>DISTANCE</label><span id="sum-dist">--</span></div>
+              <div class="summary-item"><label>TIME</label><span id="sum-time">--</span></div>
+              <div class="summary-item"><label>AVG SPEED</label><span id="sum-avg-speed">--</span></div>
+            </div>
+            <button class="tactical-btn" onclick="app.closeSummary()">CLOSE</button>
+          </div>
+        </div>
+
+        <div id="intel-feed" class="intel-feed"></div>
+
+        <!-- Startup Loading Overlay -->
+        <div id="startup-loader" class="startup-loader">
+          <div class="loader-content">
+            <div class="loader-spinner"></div>
+            <h1 class="loader-title">VIMAPS SYSTEM</h1>
+            <p class="loader-status" id="loader-status">Initializing tactical link...</p>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    // UI Shell is rendered, but we wait for heavy systems to bind listeners
+    // to avoid double-binding or binding to uninitialized objects.
+  }
+
+  private async initHeavySystems() {
+    console.log('[App] GPS_REQUEST_START');
+    if (!this.token) {
+      console.error('Critical: Mapbox Token missing.');
+      return;
+    }
+
+    const loaderStatus = document.getElementById('loader-status');
+    const loader = document.getElementById('startup-loader');
+    
+    // 1. GPS LOCK WINDOW (5-8 Seconds)
+    const geoService = new GeolocationService(null);
+    const cached = LocationCache.get();
+    
+    let initialCoords: [number, number];
+    try {
+      // Race between GPS and an 8s timeout (Requirement: 5-8s)
+      initialCoords = await Promise.race([
+        geoService.getCurrentLocation(),
+        new Promise<[number, number]>((_, reject) => setTimeout(() => reject('TIMEOUT'), 8000))
+      ]);
+      console.log(`[App] GPS_SUCCESS: ${initialCoords[0]}, ${initialCoords[1]}`);
+    } catch (e) {
+      console.warn('[App] GPS_ACQUISITION_TIMEOUT - Using Tactical Cache Fallback');
+      initialCoords = cached?.coords || [28.0473, -26.2041];
+    }
+
+    this.currentOriginCoords = initialCoords;
+    console.log(`[App] MAP_CENTER_SET: ${initialCoords[0]}, ${initialCoords[1]}`);
+
+    // 2. Initialize Map at the resolved coordinates
+    this.map = new MapRenderer('map-container', this.token!, initialCoords);
+    (window as any).app = this;
+    (window as any).appMap = this.map;
+    
+    this.routeOptimizer = new RouteOptimizer(this.token!);
+    this.navSystem = new NavigationSystem();
+
+    // Background systems
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(() => {
+        this.routeOptimizer.prewarmRouting();
+        new SensorIntelligence(this.navSystem).start();
+      });
+    }
+
+    this.map.map.on('load', () => {
+      console.log('[App] MAP_READY');
+      
+      // 3. VEHICLE_MARKER_SET & AUTO-FOLLOW
+      this.navSystem.snapToPosition(initialCoords, 0);
+      this.navSystem.startTracking();
+      this.map.enterNavigationMode(); // This enables camera follow mode
+      this.setupNavigationStateListener();
+
+      if (this.map.visualEffects) {
+        this.map.visualEffects.updateUserVehicle(initialCoords, 0);
+        console.log('[App] VEHICLE_MARKER_SET');
+      }
+
+      // REVEAL UI
+      console.log('[App] READY_STATE_ENTERED');
+      const mapCanvas = this.map.map.getCanvas();
+      if (mapCanvas) mapCanvas.style.opacity = '1';
+      
+      if (loader) {
+        loader.classList.add('hidden');
+        setTimeout(() => loader.remove(), 800);
+      }
+      
+      this.initSystemMonitor();
+      import('./engine/smartCityService').then(({ smartCity }) => {
+        smartCity.onSignalUpdate((signals) => this.map.updateTrafficSignals(signals));
+      });
+
+      // Update origin input
+      const originInput = document.getElementById('origin-input') as HTMLInputElement;
+      if (originInput) originInput.value = 'Current Location';
+    });
+
+    this.setupListeners();
+  }
+
+  private debounce(func: Function, wait: number) {
+    let timeout: any;
+    return (...args: any[]) => {
+      clearTimeout(timeout);
+      timeout = setTimeout(() => func.apply(this, args), wait);
+    };
+  }
+
+  private setupListeners() {
+    const destInput = document.getElementById('dest-input') as HTMLInputElement;
+    const originInput = document.getElementById('origin-input') as HTMLInputElement;
+
+    // Handle Search Inputs
+    destInput?.addEventListener('input', this.debounce(() => {
+      this.handleGeocoding(destInput.value, 'destination');
+    }, 300));
+
+    originInput?.addEventListener('input', this.debounce(() => {
+      this.handleGeocoding(originInput.value, 'origin');
+    }, 300));
+
+    // Handle Transportation Modes
+    document.querySelectorAll('.transport-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const type = (e.currentTarget as HTMLElement).dataset.type as TransportType;
+        this.currentTransportType = type;
+        
+        document.querySelectorAll('.transport-tab').forEach(t => t.classList.remove('active'));
+        (e.currentTarget as HTMLElement).classList.add('active');
+        
+        this.finalizeRouting(type);
+      });
+    });
+
+    // Sidebar
+    const sidebar = document.getElementById('sidebar');
+    document.getElementById('open-sidebar')?.addEventListener('click', () => sidebar?.classList.add('open'));
+    document.getElementById('close-sidebar')?.addEventListener('click', () => sidebar?.classList.remove('open'));
+
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const text = (e.currentTarget as HTMLElement).innerText;
+        sidebar?.classList.remove('open');
+        
+        if (text.includes('Saved Sectors')) {
+          if (this.map) {
+            this.map.flyTo(28.0473, -26.2041, 15);
+            this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
+          } else {
+            this.showTacticalNotification('SYSTEM INITIALIZING: PLEASE WAIT');
+          }
+        } else if (text.includes('Recent Missions')) {
+          this.showTacticalNotification('LOADING MISSION ARCHIVES...');
+        }
+      });
+    });
+
+    // Explore Intel Toggle
+    const intelBtn = document.getElementById('toggle-intel');
+    if (intelBtn) {
+      intelBtn.addEventListener('click', () => {
+        const isActive = intelBtn.classList.toggle('active');
+        this.map.visualEffects.togglePOILayers(isActive);
+        this.showTacticalNotification(isActive ? 'TACTICAL POI LAYERS ENABLED' : 'POI LAYERS DEACTIVATED');
+      });
+    }
+
+    const stealthBtn = document.getElementById('toggle-stealth');
+    if (stealthBtn) {
+      stealthBtn.addEventListener('click', () => {
+        const isActive = stealthBtn.classList.toggle('active');
+        realtime.setStealthMode(isActive);
+        stealthBtn.innerText = `🛡️ Tactical Stealth Mode: ${isActive ? 'ON' : 'OFF'}`;
+        this.showTacticalNotification(isActive ? 'STEALTH MODE ENABLED - COORDINATES ANONYMIZED' : 'STEALTH MODE DISABLED');
+      });
+    }
+
+    // Directions Toggle
+    document.getElementById('lock-dest')?.addEventListener('click', () => {
+      if (this.currentDestCoords) this.advanceToTransportStep();
+    });
+
+    document.getElementById('close-directions')?.addEventListener('click', () => {
+      document.getElementById('directions-view')!.style.display = 'none';
+      document.getElementById('search-view')!.style.display = 'flex';
+      if (this.map) this.map.exitNavigationMode();
+    });
+
+    // GPS Buttons
+    document.getElementById('locate-me')?.addEventListener('click', () => {
+      if (this.currentOriginCoords) {
+        if (this.map) this.map.flyTo(this.currentOriginCoords[0], this.currentOriginCoords[1]);
+        this.showTacticalNotification('RE-CENTERING ON OPERATOR COORDINATES');
+      }
+    });
+
+    document.getElementById('locate-origin')?.addEventListener('click', () => {
+      if (this.currentOriginCoords) {
+        (document.getElementById('origin-input') as HTMLInputElement).value = 'Your Location';
+        this.handleGeocodingSelection('Your Location', this.currentOriginCoords, 'origin');
+      }
+    });
+
+    // Exit Nav
+    document.getElementById('exit-nav')?.addEventListener('click', () => this.stopNavigation());
+
+    // Recenter
+    document.getElementById('recenter-btn')?.addEventListener('click', () => {
+      if (this.map) this.map.recenter();
+    });
+
+    // Weather
+    document.getElementById('weather-toggle')?.addEventListener('click', () => {
+      if (this.map.visualEffects) this.map.visualEffects.toggleWeather();
+    });
+
+    // POI Dropdown
+    const dropdownToggle = document.getElementById('poi-dropdown-toggle');
+    const dropdownMenu = document.getElementById('poi-dropdown-menu');
+
+    dropdownToggle?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      dropdownMenu?.classList.toggle('active');
+      dropdownToggle.classList.toggle('active');
+    });
+
+    // SOS Button
+    document.getElementById('sos-btn')?.addEventListener('click', () => this.handleSOSTrigger());
+
+    // Listen for incoming SOS from other units
+    window.addEventListener('tactical-sos', (e: any) => this.showIncomingSOS(e.detail));
+
+    // Close menu when clicking outside
+    document.addEventListener('click', () => {
+      dropdownMenu?.classList.remove('active');
+      dropdownToggle?.classList.remove('active');
+    });
+
+    document.querySelectorAll('[data-poi]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cat = (e.currentTarget as HTMLElement).dataset.poi!;
+        this.filterUrbanIntelligence(cat);
+        dropdownMenu?.classList.remove('active');
+        dropdownToggle?.classList.remove('active');
+      });
+    });
+  }
+
+  private async handleGeocoding(query: string, mode: 'origin' | 'destination') {
+    if (!query || query.length < 2) return;
+    
+    if (this.geocodingAbortController) this.geocodingAbortController.abort();
+    this.geocodingAbortController = new AbortController();
+
+    try {
+      const proximity = this.currentOriginCoords ? `&proximity=${this.currentOriginCoords[0]},${this.currentOriginCoords[1]}` : '';
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${this.token}${proximity}&limit=5&country=ZA`;
+      
+      const res = await fetch(url, { signal: this.geocodingAbortController.signal });
+      const data = await res.json();
+      this.displaySuggestions(data.features, mode);
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') console.error('Geocoding fail:', e);
+    }
+  }
+
+  private displaySuggestions(features: any[], mode: 'origin' | 'destination') {
+    const list = mode === 'destination' ? document.getElementById('suggestions-list') : document.getElementById('origin-suggestions');
+    if (!list) return;
+
+    list.innerHTML = features.map(f => `
+      <div class="suggestion-item" data-lng="${f.center[0]}" data-lat="${f.center[1]}" data-text="${f.text}">
+        <div class="sugg-main">${f.text}</div>
+        <div class="sugg-sub">${f.place_name}</div>
+      </div>
+    `).join('');
+    
+    list.style.display = features.length > 0 ? 'block' : 'none';
+
+    list.querySelectorAll('.suggestion-item').forEach(item => {
+      item.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const coords: [number, number] = [parseFloat(target.dataset.lng!), parseFloat(target.dataset.lat!)];
+        this.handleGeocodingSelection(target.dataset.text!, coords, mode);
+      });
+    });
+  }
+
+  private handleGeocodingSelection(name: string, coords: [number, number], mode: 'origin' | 'destination') {
+    const inputId = mode === 'destination' ? 'dest-input' : 'origin-input';
+    const listId = mode === 'destination' ? 'suggestions-list' : 'origin-suggestions';
+    
+    (document.getElementById(inputId) as HTMLInputElement).value = name;
+    document.getElementById(listId)!.style.display = 'none';
+
+    if (mode === 'origin') {
+      this.currentOriginCoords = coords;
+    } else {
+      this.currentDestCoords = coords;
+      document.getElementById('final-dest-display')!.setAttribute('value', name);
+      (document.getElementById('final-dest-display') as HTMLInputElement).value = name;
+      
+      const reasoning = document.getElementById('loader-status');
+      const address = name.split(',')[0];
+      if (reasoning) reasoning.innerText = `AI Assistant: Position acquired: ${address}.`;
+      this.map.flyTo(coords[0], coords[1]);
+
+      if (this.currentOriginCoords && this.currentDestCoords) {
+        this.advanceToTransportStep();
+      }
+    }
+  }
+
+  private advanceToTransportStep() {
+    document.getElementById('search-view')!.style.display = 'none';
+    document.getElementById('directions-view')!.style.display = 'flex';
+    
+    const firstTab = document.querySelector('.transport-tab') as HTMLElement;
+    if (firstTab) firstTab.click();
+  }
+
+  private async finalizeRouting(type: TransportType) {
+    if (!this.currentOriginCoords || !this.currentDestCoords) return;
+
+    if (this.routingAbortController) this.routingAbortController.abort();
+    this.routingAbortController = new AbortController();
+
+    const profile = TRANSPORT_PROFILES[type].mapboxProfile;
+    
+    try {
+      const route = await this.routeOptimizer.fetchAndOptimizeRoute(
+        this.currentOriginCoords,
+        this.currentDestCoords,
+        profile,
+        this.routingAbortController.signal
+      );
+
+      if (route) {
+        // PRE-INIT HUD: Show data before motion starts
+        const etaEl = document.getElementById('nav-eta-time');
+        const distEl = document.getElementById('nav-dist-left');
+        const arrivalEl = document.getElementById('nav-arrival');
+        if (etaEl) etaEl.innerText = `${Math.round(route.duration / 60)} min`;
+        if (distEl) distEl.innerText = `${(route.distance / 1000).toFixed(1)} km`;
+        
+        const safetyEl = document.getElementById('safety-badge');
+        if (safetyEl) {
+          safetyEl.innerText = `🛡️ TSI: ${route.safetyScore}`;
+          safetyEl.className = `safety-badge ${route.safetyScore > 80 ? 'high' : (route.safetyScore < 40 ? 'low' : '')}`;
+        }
+
+        this.map.executeCameraSequence(this.currentOriginCoords, this.currentDestCoords, route.coordinates);
+        this.map.updateRoute(route);
+        this.startNavigation(route);
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') console.error('Routing fail:', e);
+    }
+  }
+
+  private startNavigation(route: OptimizedRoute) {
+    this.tripStartTime = Date.now();
+    this.tripTotalDistance = route.distance;
+    
+    this.navSystem.start(route, TRANSPORT_PROFILES[this.currentTransportType].mapboxProfile);
+    
+    document.getElementById('maneuver-card')!.style.display = 'flex';
+    document.getElementById('nav-bottom-bar')!.style.display = 'flex';
+    document.getElementById('recenter-btn')!.style.display = 'flex';
+    
+    // HIDE TOP UI: Remove search/directions during active nav
+    const topControls = document.querySelector('.top-controls') as HTMLElement;
+    if (topControls) topControls.style.display = 'none';
+    
+    if (this.map.visualEffects) {
+      this.map.visualEffects.setNavigating(true);
+    }
+    
+    // Ensure Intel dropdown remains accessible
+    const intelDropdown = document.querySelector('.dropdown-container') as HTMLElement;
+    if (intelDropdown) intelDropdown.style.display = 'flex';
+    
+    const briefing = intelligence.generateTacticalBriefing(route, this.currentTransportType);
+    this.showTacticalNotification(briefing.brief);
+    this.speakBriefing(briefing.brief);
+    
+    const hazardFab = document.getElementById('hazard-fab');
+    if (hazardFab) hazardFab.style.display = 'flex';
+    
+    this.navSystem.onOffRoute = () => {
+      this.speakBriefing("Recalculating route.");
+      this.finalizeRouting(this.currentTransportType);
+    };
+  }
+
+  private filterUrbanIntelligence(category: string) {
+    console.log(`[App] Filtering intelligence layer: ${category}`);
+    if (this.map) {
+      this.map.setPoiFilter(category);
+      this.showTacticalNotification(`SCANNING SECTOR FOR: ${category.toUpperCase()}`);
+    }
+  }
+
+  public reportHazard(type: string) {
+    if (!this.currentOriginCoords) return;
+    const pos = this.navSystem.getCurrentPosition() || this.currentOriginCoords;
+    
+    // 1. Report to Realtime Backend
+    realtime.reportHazard(type, pos);
+    
+    // 2. Immediate feedback in Local Feed
+    intelligence.report({
+      type: 'HAZARD',
+      payload: { type, location: pos },
+      timestamp: Date.now()
+    });
+    
+    this.speakBriefing(`Reporting ${type} at current location. Broadcasting to network.`);
+  }
+
+  public handleSOSTrigger() {
+    if (!confirm('CONFIRM TACTICAL SOS BROADCAST? This will alert all units.')) return;
+    
+    const pos = this.navSystem.getCurrentPosition() || this.currentOriginCoords;
+    if (pos) {
+      realtime.triggerSOS(pos);
+      this.speakBriefing('EMERGENCY SOS ACTIVATED. BROADCASTING TACTICAL COORDINATES.');
+      if (this.isPanicMode) {
+        document.body.classList.add('sos-mode');
+        this.showTacticalNotification('SOS BROADCAST ACTIVE - SCANNING FOR NEAREST RESPONDERS');
+        this.findNearestEmergencyPOI();
+      } else {
+      }
+    }
+  }
+
+  private showIncomingSOS(sos: any) {
+    this.showTacticalNotification(`!!! INCOMING SOS: UNIT ${sos.operatorId.substring(0,4)} !!!`, 'critical');
+    this.speakBriefing(`Emergency alert: tactical SOS received from unit ${sos.operatorId.substring(0,4)}.`);
+    
+    // Auto-fly to SOS location for immediate situational awareness
+    if (sos.location && this.map) {
+      this.map.flyTo(sos.location[0], sos.location[1], 17);
+    }
+  }
+
+  private stopNavigation() {
+    this.navSystem.stop();
+    this.map.exitNavigationMode();
+    this.map.visualEffects.clearRoute();
+    
+    document.getElementById('search-view')!.style.display = 'flex';
+    document.getElementById('nav-bottom-bar')!.style.display = 'none';
+    document.getElementById('recenter-btn')!.style.display = 'none';
+    document.getElementById('maneuver-card')!.style.display = 'none';
+    document.getElementById('hazard-fab')!.style.display = 'none';
+    
+    // RESTORE TOP UI: Show search again
+    const topControls = document.querySelector('.top-controls') as HTMLElement;
+    if (topControls) topControls.style.display = 'flex';
+    
+    if (this.map.visualEffects) {
+      this.map.visualEffects.setNavigating(false);
+    }
+    
+    this.showTripSummary();
+  }
+
+  private showTripSummary() {
+    const durationMs = Date.now() - this.tripStartTime;
+    const durationMins = Math.floor(durationMs / 60000);
+    const avgSpeed = (this.tripTotalDistance / (durationMs / 3600000)).toFixed(1);
+
+    document.getElementById('sum-dist')!.innerText = `${(this.tripTotalDistance / 1000).toFixed(1)} km`;
+    document.getElementById('sum-time')!.innerText = `${durationMins} min`;
+    document.getElementById('sum-avg-speed')!.innerText = `${avgSpeed} km/h`;
+    document.getElementById('summary-modal')!.style.display = 'block';
+  }
+
+  public closeSummary() {
+    document.getElementById('summary-modal')!.style.display = 'none';
+  }
+
+  private speakBriefing(text: string) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.pitch = 0.85;
+      utterance.rate = 1.1;
+      window.speechSynthesis.speak(utterance);
+    }
+  }
+
+  private initSystemMonitor() {
+    systemMonitor.setUpdateCallback((status) => {
+      const linkEl = document.getElementById('health-link');
+      const gpsEl = document.getElementById('health-gps');
+      const latencyEl = document.getElementById('health-latency');
+
+      if (linkEl) {
+        linkEl.innerText = status.linkStatus.toUpperCase();
+        linkEl.className = `status-indicator ${status.linkStatus}`;
+      }
+      if (gpsEl) gpsEl.innerText = `${status.gpsAccuracy} m`;
+      if (latencyEl) latencyEl.innerText = `${status.latency} ms`;
+    });
+  }
+
+  private setupNavigationStateListener() {
+    this.navSystem.onUpdate = (state) => {
+      if (this.map) {
+        this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed);
+        if (this.map.visualEffects) {
+          this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
+        }
+      }
+      
+      const compass = document.getElementById('compass-readout');
+      if (compass) compass.innerText = `HEADING: ${state.compassDirection.toUpperCase()}`;
+
+      // 3. Proactive Intelligence Alerts
+      this.navSystem.onProactiveAlert = (type, dist) => {
+        this.speakBriefing(`Caution: ${type} detected ${dist} meters ahead.`);
+        this.showTacticalNotification(`PROACTIVE ALERT: ${type} AT ${dist}m`, 'warning');
+      };
+
+      // 4. Automatic Rerouting
+      this.navSystem.onOffRoute = () => {
+        if (!this.tripStartTime) return; // Only during active trip
+        this.showTacticalNotification('MISSION DEVIATION DETECTED - CALCULATING REROUTE', 'warning');
+        this.finalizeRouting(this.currentTransportType);
+      };
+
+      // Update ETA/Dist HUD during active nav
+      const etaEl = document.getElementById('nav-eta-time');
+      const navBottomBar = document.getElementById('nav-bottom-bar');
+      if (navBottomBar && navBottomBar.style.display === 'flex') {
+        const speedMs = state.speed > 1 ? state.speed : 13.8; 
+        const remainingSeconds = state.totalDistanceRemaining / speedMs;
+        
+        const etaEl = document.getElementById('nav-eta-time');
+        const distEl = document.getElementById('nav-distance');
+        const arrivalEl = document.getElementById('nav-arrival');
+        
+        if (etaEl) etaEl.innerText = this.formatDuration(remainingSeconds);
+        if (distEl) distEl.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
+        
+        if (arrivalEl) {
+          const arrivalTime = new Date(Date.now() + remainingSeconds * 1000);
+          arrivalEl.innerText = arrivalTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+
+        const card = document.getElementById('maneuver-card');
+        if (card && state.isMoving) {
+          card.style.display = 'flex';
+          const maneuverDistEl = document.getElementById('maneuver-dist');
+          if (maneuverDistEl) maneuverDistEl.innerText = `${Math.round(state.distanceToNext)} m`;
+
+          const route = (this.navSystem as any).route; 
+          if (route && route.steps) {
+            const currentStep = route.steps[this.navSystem.currentStepIndex]; 
+            if (currentStep) {
+              const instrEl = document.getElementById('maneuver-instruction');
+              const iconEl = document.getElementById('maneuver-icon');
+              if (instrEl) instrEl.innerText = currentStep.maneuver.instruction;
+              if (iconEl) iconEl.innerText = this.getManeuverIcon(currentStep.maneuver.type);
+            }
+          }
+        }
+      }
+    };
+  }
+
+  private getManeuverIcon(type: string): string {
+    const icons: Record<string, string> = {
+      'turn': '↗',
+      'sharp turn': '⤴',
+      'slight turn': '➚',
+      'straight': '↑',
+      'on ramp': '➘',
+      'off ramp': '➚',
+      'fork': '🍴',
+      'merger': ' merge',
+      'roundabout': '🔄',
+      'arrive': '🏁'
+    };
+    for (const key in icons) {
+      if (type.toLowerCase().includes(key)) return icons[key];
+    }
+    return '↑';
+  }
+
+  private async filterUrbanIntelligence(category: string) {
+    const center = this.map.map.getCenter();
+    
+    const statusText = document.getElementById('loader-status');
+    const startupLoader = document.getElementById('startup-loader');
+    if (startupLoader && statusText) {
+      startupLoader.style.display = 'flex';
+      startupLoader.style.background = 'rgba(0,0,0,0.4)';
+      statusText.innerText = `SCANNING SECTOR FOR: ${category.toUpperCase()}...`;
+      setTimeout(() => { startupLoader.style.display = 'none'; }, 1200);
+    }
+
+    try {
+      const response = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${category}.json?proximity=${center.lng},${center.lat}&access_token=${this.token}&limit=12`
+      );
+      const data = await response.json();
+
+      if (data.features && data.features.length > 0) {
+        data.features.forEach((feature: any) => {
+          const [lng, lat] = feature.center;
+          this.map.addTacticalMarker({
+            id: feature.id,
+            type: category as any,
+            location: [lng, lat],
+            severity: 'info',
+            message: feature.text,
+            timestamp: Date.now()
+          });
+        });
+
+        const sorted = data.features.map((f: any) => {
+          const [lng, lat] = f.center;
+          const dist = Math.sqrt(Math.pow(lng - center.lng, 2) + Math.pow(lat - center.lat, 2));
+          return { ...f, dist };
+        }).sort((a: any, b: any) => a.dist - b.dist);
+
+        const nearest = sorted[0];
+        const [nlng, nlat] = nearest.center;
+        
+        this.map.flyTo(nlng, nlat, 17.5);
+        this.showTacticalNotification(`NEAREST FOUND: ${nearest.text.toUpperCase()}`);
+      }
+    } catch (err) {
+      console.error('Tactical failure: POI scan failed', err);
+    }
+  }
+
+  private async findNearestEmergencyPOI() {
+    if (!this.currentOriginCoords) return;
+    
+    // Simulate finding the nearest hospital
+    const nearestHospital: [number, number] = [
+      this.currentOriginCoords[0] + (Math.random() - 0.5) * 0.02,
+      this.currentOriginCoords[1] + (Math.random() - 0.5) * 0.02
+    ];
+    
+    this.showTacticalNotification('NEAREST MEDICAL FACILITY IDENTIFIED - PREPARING EXTRACTION');
+    this.currentDestCoords = nearestHospital;
+    this.finalizeRouting('car');
+  }
+
+  public showTacticalNotification(message: string) {
+    const feed = document.getElementById('intel-feed');
+    if (!feed) return;
+    
+    const notification = document.createElement('div');
+    notification.className = 'glass-panel alert-item alert-info';
+    notification.style.animation = 'slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1)';
+    notification.innerHTML = `
+      <div style="display:flex; align-items:center; gap:10px;">
+        <span style="color:var(--primary-accent); font-weight:bold;">[ SYSTEM ]</span>
+        <span>${message}</span>
+      </div>
+    `;
+    
+    feed.prepend(notification);
+    setTimeout(() => {
+      notification.style.opacity = '0';
+      notification.style.transform = 'translateY(-10px)';
+      setTimeout(() => notification.remove(), 400);
+    }, 4000);
+  }
+
+  private formatDuration(seconds: number): string {
+    const hrs = Math.floor(seconds / 3600);
+    const mins = Math.floor((seconds % 3600) / 60);
+    if (hrs > 0) return `${hrs}h ${mins}m`;
+    return `${mins} min`;
+  }
+}
+
+new App();
