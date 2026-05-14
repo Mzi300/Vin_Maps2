@@ -1,7 +1,7 @@
 ---
 deployment:
   tasks:
-    - export DEPLOYPATH=/home/livenets/public_html/
+    - export DEPLOYPATH=/home/livenets/maps.livenetstudios.co.za/
     - /bin/rm -rf $DEPLOYPATH/*
     - /bin/rm -f $DEPLOYPATH/.htaccess
     - /bin/rm -f $DEPLOYPATH/.env
