@@ -9,6 +9,8 @@ export class MapRenderer {
   public map!: mapboxgl.Map;
   public visualEffects!: VisualEffects;
   public cameraController!: NavigationCameraController;
+  private styleLoadedPromise: Promise<void>;
+  private resolveStyleLoaded!: () => void;
   private isNavigationMode: boolean = false;
 
   private initialCenter: [number, number] = [28.0473, -26.2041];
@@ -334,4 +336,13 @@ export class MapRenderer {
     }
   }
 
+  public updateTrafficSignals(_signals: any[]) {
+    // Placeholder for signal logic
+  }
+
+  public updateRoute(route: any) {
+    if (this.visualEffects) {
+      this.visualEffects.drawGlowingRoute(route.coordinates[0], route.coordinates[route.coordinates.length - 1], route.coordinates);
+    }
+  }
 }

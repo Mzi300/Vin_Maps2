@@ -548,7 +548,6 @@ class App {
         // PRE-INIT HUD: Show data before motion starts
         const etaEl = document.getElementById('nav-eta-time');
         const distEl = document.getElementById('nav-dist-left');
-        const arrivalEl = document.getElementById('nav-arrival');
         if (etaEl) etaEl.innerText = `${Math.round(route.duration / 60)} min`;
         if (distEl) distEl.innerText = `${(route.distance / 1000).toFixed(1)} km`;
         

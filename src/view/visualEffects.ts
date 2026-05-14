@@ -282,6 +282,15 @@ export class VisualEffects {
     this.destMarker = null;
   }
 
+  public togglePOILayers(active: boolean) {
+    if (!active) {
+      this.setPoiFilter(null);
+    } else {
+      // Default to scanning for hospitals/emergency nodes
+      this.setPoiFilter('hospital');
+    }
+  }
+
   public setPoiFilter(category: string | null) {
     // Category mapping for Mapbox Standard layers
     const layerMapping: Record<string, string[]> = {
