@@ -2,4 +2,7 @@
 deployment:
   tasks:
     - export DEPLOYPATH=/home/livenets/public_html/
+    - /bin/rm -rf $DEPLOYPATH/*
+    - /bin/rm -f $DEPLOYPATH/.htaccess
+    - /bin/rm -f $DEPLOYPATH/.env
     - /bin/cp -R dist/* $DEPLOYPATH
