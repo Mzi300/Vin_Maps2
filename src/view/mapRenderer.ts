@@ -10,10 +10,6 @@ export class MapRenderer {
   public visualEffects!: VisualEffects;
   public cameraController!: NavigationCameraController;
   private isNavigationMode: boolean = false;
-  private styleLoaded: boolean = false;
-  private styleLoadedPromise: Promise<void>;
-  private resolveStyleLoaded!: () => void;
-  private signalMarkers: Map<string, mapboxgl.Marker> = new Map();
 
   private initialCenter: [number, number] = [28.0473, -26.2041];
 

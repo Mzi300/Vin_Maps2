@@ -741,7 +741,6 @@ class App {
       };
 
       // Update ETA/Dist HUD during active nav
-      const etaEl = document.getElementById('nav-eta-time');
       const navBottomBar = document.getElementById('nav-bottom-bar');
       if (navBottomBar && navBottomBar.style.display === 'flex') {
         const speedMs = state.speed > 1 ? state.speed : 13.8; 
