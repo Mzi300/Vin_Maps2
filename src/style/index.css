@@ -34,8 +34,8 @@ body {
 }
 
 #app {
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   position: relative;
   background: #000000;
 }
@@ -136,8 +136,9 @@ body {
   margin-top: 0.5rem;
   max-height: 250px;
   overflow-y: auto;
-  z-index: 100;
+  z-index: 10005; /* High priority */
   padding: 0.5rem;
+  pointer-events: auto;
 }
 
 .suggestion-item {
@@ -441,12 +442,13 @@ body {
 .sidebar-panel {
   position: fixed;
   top: 0;
-  left: -400px; /* Hidden by default */
+  left: -400px;
   width: 350px;
   height: 100vh;
-  z-index: 100;
-  border-radius: 0 20px 20px 0;
-  padding: 2rem;
+  z-index: 5000;
+  background: rgba(10, 10, 10, 0.95);
+  border-right: 1px solid var(--glass-border);
+  backdrop-filter: blur(20px);
   transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
@@ -457,16 +459,36 @@ body {
 }
 
 .sidebar-header {
+  padding: 2rem 1.5rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--glass-border);
+  flex-shrink: 0;
 }
 
 .sidebar-content {
+  padding: 1.5rem;
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  flex: 1;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--primary-accent) transparent;
+}
+
+/* Sidebar Scrollbar Styling */
+.sidebar-content::-webkit-scrollbar {
+  width: 4px;
+}
+.sidebar-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb {
+  background: var(--primary-accent);
+  border-radius: 10px;
+  box-shadow: 0 0 10px var(--primary-accent);
 }
 
 .sidebar-item {
@@ -591,6 +613,23 @@ body {
   letter-spacing: 0.5px;
 }
 
+.nav-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 2px;
+}
+
+.safety-badge {
+  background: rgba(0, 242, 255, 0.1);
+  border: 1px solid var(--primary-accent);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  color: var(--primary-accent);
+  font-weight: 800;
+}
+
 .exit-nav-btn {
   background: rgba(255, 77, 77, 0.2);
   color: #ff4d4d;
@@ -698,6 +737,7 @@ body {
 
 /* USER LOCATION GLOW */
 .user-location-glow {
+  position: absolute;
   width: 40px;
   height: 40px;
   background: radial-gradient(circle, rgba(0, 242, 255, 0.6) 0%, transparent 70%);
@@ -705,6 +745,7 @@ body {
   box-shadow: 0 0 20px rgba(0, 242, 255, 0.4);
   animation: user-pulse 2s ease-in-out infinite;
   pointer-events: none;
+  z-index: 10;
 }
 
 @keyframes user-pulse {
@@ -788,72 +829,7 @@ body {
   border-radius: 10px;
 }
 
-.sidebar-panel {
-  position: absolute;
-  top: 0;
-  left: -400px;
-  width: 350px;
-  height: 100%;
-  background: rgba(10, 10, 10, 0.95);
-  border-right: 1px solid var(--glass-border);
-  z-index: 2000;
-  transition: left 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  display: flex;
-  flex-direction: column;
-  backdrop-filter: blur(20px);
-}
-
-.sidebar-panel.open {
-  left: 0;
-}
-
-.sidebar-header {
-  padding: 2rem 1.5rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-bottom: 1px solid var(--glass-border);
-}
-
-.sidebar-content {
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-
-.sidebar-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.sidebar-item {
-  background: transparent;
-  border: 1px solid transparent;
-  color: #ccc;
-  padding: 0.8rem 1rem;
-  border-radius: 8px;
-  text-align: left;
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.95rem;
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.sidebar-item:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #fff;
-  border-color: var(--glass-border);
-}
-
-.sidebar-divider {
-  height: 1px;
-  background: var(--glass-border);
-  margin: 0.5rem 0;
-}
+/* Sidebar items styled within consolidated content area above */
 
 .close-btn {
   background: transparent;
@@ -870,24 +846,21 @@ body {
 
 
 .recenter-btn {
-  position: absolute;
-  bottom: 6rem;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 0.6rem 1.2rem;
-  border-radius: 30px;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
   color: var(--primary-accent);
   font-weight: bold;
-  font-size: 0.8rem;
+  font-size: 1.2rem;
   cursor: pointer;
-  z-index: 60;
   border: 1px solid var(--primary-accent);
   box-shadow: 0 0 15px rgba(0, 242, 255, 0.2);
   transition: all 0.2s;
-  animation: slideInUp 0.3s ease-out;
+  background: var(--panel-bg);
+  backdrop-filter: blur(12px);
 }
 
 .recenter-btn:hover {
@@ -1257,7 +1230,7 @@ body {
   bottom: 2rem;
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 40px; /* Precise 1cm spacing */
 }
 
 .dropdown-container {
@@ -1336,6 +1309,13 @@ body {
   color: #fff;
 }
 
+.dropdown-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0.5rem 0;
+  width: 100%;
+}
+
 .arrow {
   transition: transform 0.3s;
   display: inline-block;
@@ -1397,8 +1377,778 @@ body {
 
 .menu-btn:hover {
   color: var(--primary-accent);
+}.ui-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* Anchor top and bottom HUDs */
+  padding: 1.5rem;
+  overflow: hidden;
 }
 
+.bottom-hud-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  pointer-events: none;
+  align-items: flex-start;
+}
 
+.bottom-hud-container > * {
+  pointer-events: auto;
+}
+
+/* --- MOBILE RESPONSIVE ADAPTATIONS --- */
+@media (max-width: 600px) {
+  .ui-overlay {
+    padding: 0.8rem;
+  }
+
+  /* Mobile-specific padding and touch targets */
+  .cat-btn, .transport-tab, .mini-gps-btn {
+    min-height: 40px; /* Reduced for better fit */
+    font-size: 0.9rem;
+  }
+
+  .dropdown-menu {
+    width: max-content;
+    max-width: calc(100vw - 2rem);
+    left: 1rem;
+    bottom: 110%;
+    max-height: 60vh;
+    overflow-y: auto;
+    padding-right: 1cm; /* 1cm space after words as requested */
+  }
+
+  .ui-overlay {
+    padding: 0.8rem 0; /* Remove horizontal padding for edge-to-edge top/bottom */
+  }
+
+  .top-controls {
+    width: 100% !important;
+    max-width: 100%;
+    margin: 0;
+    padding: 0.5rem 0.8rem;
+    position: absolute;
+    top: env(safe-area-inset-top, 0);
+    left: 0;
+    z-index: 1000;
+  }
+
+  .command-bar {
+    width: 100% !important;
+    padding: 0.5rem 1rem;
+    box-sizing: border-box;
+    border-radius: 30px; /* Google Maps style pill */
+    background: rgba(15, 15, 15, 0.9);
+    border: 1px solid var(--primary-accent);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+  }
+
+  .category-bar {
+    display: flex;
+    gap: 0.5rem;
+    overflow-x: auto;
+    padding: 0.5rem 0;
+    scrollbar-width: none; /* Hide scrollbar */
+    -ms-overflow-style: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .category-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .cat-btn {
+    padding: 0.4rem 1rem !important;
+    min-height: unset !important;
+    height: 32px !important;
+    font-size: 0.85rem !important;
+    border-radius: 20px !important;
+    background: var(--panel-bg);
+    border: 1px solid var(--glass-border) !important;
+  }
+
+  .sidebar-panel {
+    width: 100%;
+    left: -100%;
+  }
+
+  .nav-bar-minimal {
+    width: 94vw !important;
+    left: 3vw !important;
+    bottom: calc(1rem + env(safe-area-inset-bottom, 0px)) !important;
+    transform: none !important;
+    padding: 0.6rem 1rem !important;
+    border-radius: 20px !important;
+    display: flex !important;
+    flex-direction: row !important; /* Back to horizontal row */
+    justify-content: space-between !important;
+    align-items: center !important;
+    background: rgba(10, 10, 10, 0.98) !important;
+    border: 1px solid var(--primary-accent) !important;
+    box-shadow: 0 4px 30px rgba(0,0,0,0.8) !important;
+    height: auto !important;
+    min-height: unset !important;
+    gap: 10px !important;
+    transform: translate3d(0, 0, 0) !important;
+    will-change: transform, opacity !important;
+  }
+
+  .maneuver-card {
+    top: calc(5.2rem + env(safe-area-inset-top, 0px));
+    left: 5vw !important;
+    width: 90vw !important;
+    transform: none !important;
+    padding: 0.4rem 0.8rem; /* Slimmer maneuver card */
+    justify-content: flex-start;
+    z-index: 10001;
+    min-width: unset;
+    border-radius: 12px;
+    transform: translate3d(0, 0, 0) !important;
+    will-change: transform, opacity !important;
+  }
+
+  .instruction-main {
+    font-size: clamp(12px, 3.5vw, 18px) !important;
+  }
+
+  .instruction-sub {
+    font-size: clamp(10px, 2.8vw, 14px) !important;
+  }
+
+  .maneuver-icon {
+    font-size: clamp(20px, 6vw, 32px) !important;
+  }
+
+  .suggestions-panel {
+    width: 100% !important;
+    left: 0 !important;
+    right: 0 !important;
+    border-radius: 0 0 12px 12px;
+  }
+
+  .nav-info-group {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 2px !important;
+    flex: 1;
+  }
+
+  .nav-main-eta {
+    font-size: clamp(16px, 5vw, 24px) !important; /* Using clamp() for responsive font scaling */
+    color: #47ffb3 !important;
+    font-weight: 900;
+    text-shadow: 0 0 10px rgba(71, 255, 179, 0.4);
+  }
+
+  .nav-info {
+    display: flex !important;
+    flex-direction: row !important; /* Row for secondary info */
+    flex-wrap: wrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    font-size: clamp(11px, 3.2vw, 15px) !important;
+    color: rgba(255, 255, 255, 0.8) !important;
+  }
+
+  .nav-info span {
+    white-space: nowrap;
+  }
+
+  .safety-badge {
+    padding: 2px 6px;
+    font-size: clamp(10px, 2.8vw, 13px) !important;
+    border-radius: 6px;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .exit-nav-btn {
+    width: auto !important;
+    padding: 0.6rem 1.2rem !important; /* Touch-friendly padding */
+    font-size: clamp(11px, 3.2vw, 14px) !important;
+    background: rgba(255, 77, 77, 0.2) !important;
+    border: 1px solid #ff4d4d !important;
+    color: #ff4d4d !important;
+    border-radius: 30px !important;
+    margin: 0 !important;
+    text-transform: uppercase;
+    font-weight: 900;
+    flex-shrink: 0;
+    min-height: 44px; /* Ergonomic touch target */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease-in-out;
+  }
+
+  .exit-nav-btn:active {
+    background: #ff4d4d !important;
+    color: white !important;
+    transform: scale(0.95);
+  }
+
+  .hazard-fab {
+    right: 0.8rem;
+    top: 60%;
+  }
+
+  .floating-controls {
+    right: 1.5rem;
+    bottom: 22vh;
+    display: flex;
+    flex-direction: column;
+    gap: 40px; /* Precise 1cm separation */
+    z-index: 10002;
+  }
+
+  .sos-fab-container {
+    bottom: 1.5rem;
+    right: 1.5rem;
+  }
+
+  .gta-stats-panel {
+    width: 100%;
+  }
+
+  .search-input {
+    font-size: 0.9rem;
+  }
+}
+
+/* --- DETAILED DEVICE BREAKPOINT CLASS INJECTIONS --- */
+
+/* Breakpoint 1: 320px (Ultra-Compact/Low-end Android) */
+#app.compact-320 .nav-bar-minimal {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  border-radius: 16px !important;
+  padding: 0.8rem !important;
+  gap: 10px !important;
+  width: 94% !important;
+  left: 3% !important;
+  bottom: calc(0.5rem + env(safe-area-inset-bottom, 0px)) !important;
+}
+
+#app.compact-320 .nav-info-group {
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+}
+
+#app.compact-320 .nav-info {
+  gap: 6px !important;
+}
+
+#app.compact-320 .exit-nav-btn {
+  width: 100% !important;
+  min-height: 48px !important; /* Safe touch target */
+  border-radius: 12px !important;
+  font-size: 13px !important;
+}
+
+#app.compact-320 .maneuver-card {
+  width: 94% !important;
+  left: 3% !important;
+  padding: 0.4rem 0.6rem !important;
+  top: calc(4.8rem + env(safe-area-inset-top, 0px)) !important;
+}
+
+/* Breakpoint 2: 360px (Standard Portrait Android Phones) */
+#app.compact-360 .nav-bar-minimal {
+  padding: 0.7rem 1rem !important;
+  width: 94vw !important;
+  left: 3vw !important;
+}
+
+#app.compact-360 .exit-nav-btn {
+  padding: 0.5rem 1rem !important;
+  min-height: 44px !important;
+}
+
+/* Breakpoint 3: 480px (Large Android Phones / Portrait Phablets) */
+#app.compact-480 .nav-bar-minimal {
+  width: 86vw !important;
+  left: 7vw !important;
+  padding: 0.8rem 1.2rem !important;
+}
+
+#app.compact-480 .exit-nav-btn {
+  padding: 0.6rem 1.4rem !important;
+}
+
+/* Breakpoint 4: 768px (Tablets / Portrait Foldable screens) */
+#app.tablet-768 .nav-bar-minimal {
+  width: auto !important;
+  min-width: 450px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  bottom: 2rem !important;
+}
+
+#app.tablet-768 .maneuver-card {
+  width: auto !important;
+  min-width: 400px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  top: 2rem !important;
+}
+
+/* Breakpoint 5: 1024px+ (Landscape Foldables / Tablets / Desktops) */
+#app.desktop-1024 .nav-bar-minimal {
+  width: auto !important;
+  min-width: 500px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  bottom: 2.5rem !important;
+}
+
+/* Orientation Awareness: Mobile Landscape Layout Fixes */
+#app.mobile-landscape .nav-bar-minimal {
+  width: auto !important;
+  min-width: 320px !important;
+  left: auto !important;
+  right: 1.5rem !important;
+  bottom: 1.5rem !important;
+  transform: none !important;
+  border-radius: 16px !important;
+  padding: 0.6rem 1rem !important;
+}
+
+#app.mobile-landscape .maneuver-card {
+  width: auto !important;
+  min-width: 300px !important;
+  left: 1.5rem !important;
+  top: 1.5rem !important;
+  transform: none !important;
+}
+
+#app.mobile-landscape .floating-controls {
+  bottom: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  right: 1.5rem !important;
+  gap: 15px !important;
+}
+
+#app.mobile-landscape .hazard-fab {
+  right: 6.5rem !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  flex-direction: row !important;
+  gap: 8px !important;
+}
+
+#app.mobile-landscape .sos-fab-container {
+  top: 1.5rem !important;
+  bottom: auto !important;
+  right: auto !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+/* --- HARDWARE-ACCELERATED HARDWARE RENDERING & SKELETON LOADERS --- */
+
+/* GPU Compositing and Offloading */
+.nav-bar-minimal, 
+.maneuver-card, 
+.sidebar-panel, 
+.alert-item, 
+.gta-hud-card,
+.recenter-btn,
+.weather-toggle-btn {
+  transform: translate3d(0, 0, 0);
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+/* Pulse Glow Skeleton Loader style */
+.skeleton-loading {
+  position: relative !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+.skeleton-loading::after {
+  content: "" !important;
+  position: absolute !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(0, 242, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0) 100%
+  ) !important;
+  animation: skeletonPulse 1.5s infinite linear !important;
+  background-size: 200% 100% !important;
+  z-index: 10000 !important;
+}
+
+@keyframes skeletonPulse {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* ==========================================================================
+   UNIVERSAL DESTINATION INTELLIGENCE CARDS & SUGGESTIONS OVERLAYS
+   ========================================================================== */
+
+.suggestions-panel {
+  position: absolute !important;
+  top: 100% !important;
+  left: 0 !important;
+  width: 100% !important;
+  margin-top: 0.5rem !important;
+  max-height: 400px !important; /* Expanded height for POI cards */
+  overflow-y: auto !important;
+  z-index: 10005 !important;
+  padding: 0.6rem !important;
+  pointer-events: auto !important;
+  border-radius: 12px !important;
+  border: 1px solid rgba(0, 242, 255, 0.2) !important;
+  background: rgba(10, 10, 10, 0.96) !important;
+  backdrop-filter: blur(16px) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Custom scrollbar for premium aesthetic */
+.suggestions-panel::-webkit-scrollbar {
+  width: 6px !important;
+}
+
+.suggestions-panel::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02) !important;
+  border-radius: 10px !important;
+}
+
+.suggestions-panel::-webkit-scrollbar-thumb {
+  background: rgba(0, 242, 255, 0.3) !important;
+  border-radius: 10px !important;
+}
+
+.suggestions-panel::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 242, 255, 0.6) !important;
+}
+
+.destination-card {
+  background: rgba(20, 20, 20, 0.8) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 10px !important;
+  padding: 0.75rem !important;
+  margin-bottom: 0.6rem !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  transform: translate3d(0, 0, 0);
+  will-change: transform, border-color, box-shadow;
+}
+
+.destination-card:hover {
+  border-color: var(--primary-accent) !important;
+  background: rgba(0, 242, 255, 0.04) !important;
+  box-shadow: 0 4px 15px rgba(0, 242, 255, 0.15) !important;
+  transform: translateY(-2px) !important;
+}
+
+.destination-card-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  width: 100% !important;
+}
+
+.destination-icon-wrap {
+  font-size: 1.3rem !important;
+  width: 32px !important;
+  height: 32px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+.destination-title-wrap {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+}
+
+.destination-name {
+  font-size: 0.9rem !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  line-height: 1.25 !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+  overflow: hidden !important;
+}
+
+.destination-category {
+  font-size: 0.65rem !important;
+  color: var(--text-dim) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.destination-status-badge {
+  font-size: 0.6rem !important;
+  font-weight: 900 !important;
+  padding: 3px 6px !important;
+  border-radius: 4px !important;
+  text-transform: uppercase !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+}
+
+.destination-status-badge.open, 
+.destination-status-badge.active {
+  background: rgba(71, 255, 179, 0.1) !important;
+  color: #47ffb3 !important;
+  border: 1px solid rgba(71, 255, 179, 0.25) !important;
+}
+
+.destination-status-badge.open-24-7 {
+  background: rgba(0, 242, 255, 0.1) !important;
+  color: #00f2ff !important;
+  border: 1px solid rgba(0, 242, 255, 0.25) !important;
+}
+
+.destination-status-badge.closed {
+  background: rgba(255, 77, 77, 0.1) !important;
+  color: #ff4d4d !important;
+  border: 1px solid rgba(255, 77, 77, 0.25) !important;
+}
+
+.destination-card-body {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  background: rgba(255, 255, 255, 0.02) !important;
+  padding: 6px 8px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(255, 255, 255, 0.03) !important;
+}
+
+.destination-meta-item {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: flex-start !important;
+  flex: 1 !important;
+}
+
+.meta-label {
+  font-size: 0.55rem !important;
+  color: var(--text-dim) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.3px !important;
+}
+
+.meta-value {
+  font-size: 0.75rem !important;
+  color: #ffffff !important;
+  font-weight: 800 !important;
+}
+
+.safety-score-high {
+  color: #47ffb3 !important;
+  font-weight: 800 !important;
+}
+
+.safety-score-medium {
+  color: #ffb347 !important;
+  font-weight: 800 !important;
+}
+
+.safety-score-low {
+  color: #ff4d4d !important;
+  font-weight: 800 !important;
+}
+
+.destination-card-footer {
+  display: flex !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  width: 100% !important;
+  margin-top: 2px !important;
+}
+
+.route-badges {
+  display: flex !important;
+  gap: 4px !important;
+}
+
+.route-badge {
+  font-size: 0.85rem !important;
+  opacity: 0.8 !important;
+}
+
+.navigate-now-btn {
+  background: linear-gradient(135deg, #00f2ff 0%, #0072ff 100%) !important;
+  color: #ffffff !important;
+  border: none !important;
+  padding: 4px 10px !important;
+  font-size: 0.65rem !important;
+  font-weight: 900 !important;
+  border-radius: 12px !important;
+  cursor: pointer !important;
+  box-shadow: 0 0 8px rgba(0, 242, 255, 0.3) !important;
+  transition: all 0.2s !important;
+  letter-spacing: 0.3px !important;
+}
+
+.navigate-now-btn:hover {
+  transform: scale(1.04) !important;
+  box-shadow: 0 0 12px rgba(0, 242, 255, 0.5) !important;
+}
+
+/* Hide Mapbox Logo and Attribution elements at bottom-left and bottom-right corners */
+.mapboxgl-ctrl-logo, 
+.mapboxgl-ctrl-attrib,
+.mapboxgl-ctrl-attrib-button {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* ==========================================================================
+   TACTICAL UNIFIED RIGHT TOOLBAR STACK OVERRIDES
+   ========================================================================== */
+
+/* Align the entire floating stack vertically centered on the right margin */
+.floating-controls {
+  position: absolute !important;
+  right: 1.5rem !important;
+  top: 50% !important;
+  bottom: auto !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 1rem !important; /* Uniform spacing between all buttons */
+  z-index: 10002 !important;
+  pointer-events: none !important;
+}
+
+/* Force buttons to trigger touch/pointer events */
+.floating-controls button,
+.floating-controls .gta-hud-circle,
+.floating-controls .hazard-btn {
+  pointer-events: auto !important;
+}
+
+/* Make Recenter and Weather buttons match the gorgeous tactical glass style of hazard buttons */
+.floating-controls .gta-hud-circle {
+  width: 50px !important;
+  height: 50px !important;
+  border-radius: 50% !important;
+  border: 1px solid var(--glass-border) !important;
+  background: var(--panel-bg) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #ffffff !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+  font-size: 1.4rem !important;
+}
+
+/* Apply neon cyan scale hover effect to recenter and weather buttons */
+.floating-controls .gta-hud-circle:hover {
+  transform: scale(1.1) !important;
+  border-color: var(--primary-accent) !important;
+  box-shadow: 0 0 15px var(--primary-accent) !important;
+  background: var(--panel-bg) !important;
+  color: #ffffff !important;
+}
+
+.floating-controls .gta-hud-circle:active {
+  transform: scale(0.95) !important;
+}
+
+/* Flatten the nested hazard FAB container so it flows naturally in the same column */
+.floating-controls .hazard-fab {
+  position: static !important;
+  transform: none !important;
+  display: none; /* Controlled dynamically by main.ts */
+  flex-direction: column !important;
+  gap: inherit !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  z-index: auto !important;
+}
+
+/* Ensure hazard-fab display overrides use flex when active */
+.floating-controls .hazard-fab[style*="display: flex"],
+.floating-controls .hazard-fab[style*="display:flex"] {
+  display: flex !important;
+}
+
+/* Align mobile positions to be identical and clear of HUD panels */
+@media (width <= 600px) {
+  .floating-controls {
+    right: 0.8rem !important;
+    top: 45% !important;
+    transform: translateY(-50%) !important;
+    gap: 0.8rem !important;
+  }
+}
+
+/* Premium Zoom Control Pill (Google Maps / Waze Style) */
+.zoom-controls-group {
+  display: flex;
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.8);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  border-radius: 25px;
+  overflow: hidden;
+  pointer-events: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+}
+
+.zoom-pill-btn {
+  width: 50px;
+  height: 45px;
+  background: transparent;
+  border: none;
+  color: white;
+  font-size: 1.5rem;
+  font-weight: bold;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.zoom-pill-btn:hover {
+  background: var(--primary-accent);
+  color: #000;
+}
 
 

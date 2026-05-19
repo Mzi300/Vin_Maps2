@@ -18,8 +18,13 @@ export class SystemMonitor {
   };
 
   private constructor() {
-    this.backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-    this.startMonitoring();
+    this.backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000');
+    if (!this.backendUrl) {
+      this.currentStatus.linkStatus = 'offline';
+      setTimeout(() => this.notify(), 100);
+    } else {
+      this.startMonitoring();
+    }
   }
 
   public static getInstance(): SystemMonitor {
@@ -39,23 +44,32 @@ export class SystemMonitor {
   }
 
   private async startMonitoring() {
-    setInterval(async () => {
+    let failureCount = 0;
+    
+    const monitor = async () => {
       const startTime = performance.now();
       try {
         const res = await fetch(`${this.backendUrl}/health`);
         if (res.ok) {
-          const data = await res.json();
+          await res.json();
           this.currentStatus.linkStatus = 'online';
           this.currentStatus.latency = Math.round(performance.now() - startTime);
-          // Future: map other stats from health endpoint
+          failureCount = 0;
         } else {
           this.currentStatus.linkStatus = 'offline';
+          failureCount++;
         }
       } catch (e) {
         this.currentStatus.linkStatus = 'offline';
+        failureCount++;
       }
       this.notify();
-    }, 5000);
+      
+      const nextDelay = failureCount > 3 ? 30000 : 5000;
+      setTimeout(monitor, nextDelay);
+    };
+
+    setTimeout(monitor, 1000);
   }
 
   private notify() {

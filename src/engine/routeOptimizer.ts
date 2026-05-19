@@ -69,17 +69,19 @@ export class RouteOptimizer {
             const simplifiedCoords = this.simplifyRoute(rawCoords, 0.0001);
             
             let tacticalData = { score: 100, hazardsFound: 0 };
-            try {
-              const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-              const intelRes = await fetch(`${backendUrl}/intelligence/score-route`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ coordinates: simplifiedCoords }),
-                signal
-              });
-              if (intelRes.ok) tacticalData = await intelRes.json();
-            } catch (e) {
-              // Silently fail and use default score
+            const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000');
+            if (backendUrl) {
+              try {
+                const intelRes = await fetch(`${backendUrl}/intelligence/score-route`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ coordinates: simplifiedCoords }),
+                  signal
+                });
+                if (intelRes.ok) tacticalData = await intelRes.json();
+              } catch (e) {
+                // Silently fail and use default score
+              }
             }
 
             return {

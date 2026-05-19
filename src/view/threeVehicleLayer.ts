@@ -46,19 +46,15 @@ export class ThreeVehicleLayer {
 
     const arrowGeometry = new THREE.BufferGeometry();
     const vertices = new Float32Array([
-      // Top Surface - Folded look
-      0, 0.4, 2,    // Tip
-      -1, 0, -1.5,  // Left Back
-      0, 0.2, -0.8, // Center Fold
-      
-      0, 0.4, 2,    // Tip
-      0, 0.2, -0.8, // Center Fold
-      1, 0, -1.5,   // Right Back
+      // Left Wing of Chevron
+      0, -1.8, 0,      // Tip (North, negative Y)
+      -1.2, 1.2, 0,    // Left wing back
+      0, 0.4, 0,       // Center fold
 
-      // Underside - to give it volume
-      -1, 0, -1.5,
-      1, 0, -1.5,
-      0, 0.2, -0.8
+      // Right Wing of Chevron
+      0, -1.8, 0,      // Tip (North, negative Y)
+      0, 0.4, 0,       // Center fold
+      1.2, 1.2, 0      // Right wing back
     ]);
 
     arrowGeometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
@@ -79,21 +75,20 @@ export class ThreeVehicleLayer {
     group.add(arrow);
 
     // Add a glowing core under the arrow (Tactical Pulse)
-    const glowGeometry = new THREE.CircleGeometry(1.0, 32);
+    const glowGeometry = new THREE.CircleGeometry(1.2, 32);
     const glowMaterial = new THREE.MeshBasicMaterial({
       color: 0x00f2ff,
       transparent: true,
-      opacity: 0.4,
+      opacity: 0.5,
       side: THREE.DoubleSide,
-      depthTest: false // Always visible
+      depthTest: false 
     });
     const glow = new THREE.Mesh(glowGeometry, glowMaterial);
-    glow.rotation.x = Math.PI / 2;
-    glow.position.z = -0.1;
+    glow.position.z = -0.05; 
     group.add(glow);
 
-    // Scale to standard GPS size
-    group.scale.set(2.5, 2.5, 2.5);
+    // Scale to fit the entire road width (Tactical Enormous Scale)
+    group.scale.set(6.5, 6.5, 6.5);
     
     return group;
   }
@@ -101,10 +96,11 @@ export class ThreeVehicleLayer {
   public updatePosition(coord: [number, number], bearing: number) {
     this.currentCoord = coord;
     this.currentBearing = bearing;
-    // Keep vehicle mesh upright (Y-up) and rotate to heading direction
+    if (!this.vehicleMesh) return;
     const bearingRad = THREE.MathUtils.degToRad(this.currentBearing);
-    // Mapbox bearing is clockwise, Three.js is counter-clockwise
-    this.vehicleMesh.rotation.set(Math.PI / 2, 0, -bearingRad);
+    // Mapbox bearing is clockwise, Three.js rotation is counter-clockwise.
+    // Negative Y is North in our coordinate system, so positive rotation aligns perfectly.
+    this.vehicleMesh.rotation.set(0, 0, bearingRad);
     this.map.triggerRepaint();
   }
 

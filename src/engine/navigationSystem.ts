@@ -1,4 +1,3 @@
-import { intelligence } from './intelligenceManager';
 import type { OptimizedRoute } from './routeOptimizer';
 import { systemMonitor } from './systemMonitor';
 
@@ -15,25 +14,9 @@ export interface NavState {
 
 export class RealtimeService {
   private socket: any;
-  private isStealthMode: boolean = false;
 
   constructor() {
     this.initSocket();
-  }
-
-  public setStealthMode(active: boolean) {
-    this.isStealthMode = active;
-    console.log(`[Realtime] Tactical Stealth Mode: ${active ? 'ENABLED' : 'DISABLED'}`);
-  }
-
-  private fuzzCoordinates(coords: [number, number]): [number, number] {
-    if (!this.isStealthMode) return coords;
-    // Add ~50m-100m random offset for privacy
-    const offset = 0.0005; 
-    return [
-      coords[0] + (Math.random() - 0.5) * offset,
-      coords[1] + (Math.random() - 0.5) * offset
-    ];
   }
 
   public reportHazard(type: string, location: [number, number]) {
@@ -58,10 +41,11 @@ export class NavigationSystem {
   private watchId: number | null = null;
   private lastPosition: [number, number] | null = null;
   private lastTime: number = 0;
+  private lastOrientationTime: number = 0;
   
   // Dynamic parameters based on profile
-  private speedThreshold: number = 3.0; // meters per second (higher to avoid jitter)
-  private smoothingFactor: number = 0.2;
+  private speedThreshold: number = 0.05; // Reduced from 0.2m/s
+  private smoothingFactor: number = 0.2; // Smoother movement (Reduced from 0.35)
   private minZoom: number = 15.5;
   private maxZoom: number = 18.5;
   
@@ -81,6 +65,8 @@ export class NavigationSystem {
   };
 
   private hasDetectedMotion: boolean = false;
+  private headingBuffer: number[] = [];
+  private readonly HEADING_BUFFER_SIZE = 15;
 
   public onUpdate?: (state: NavState) => void;
   public onStepChange?: (step: any) => void;
@@ -88,7 +74,6 @@ export class NavigationSystem {
   public onProactiveAlert?: (type: string, dist: number) => void;
 
   private announcedHazards: Set<string> = new Set();
-  private lastAlertTime: number = 0;
 
   public snapToPosition(pos: [number, number], heading: number) {
     this.hasDetectedMotion = false; // Reset gate
@@ -102,7 +87,8 @@ export class NavigationSystem {
       isMoving: false
     };
     this.lastPosition = pos;
-    this.lastTime = Date.now();
+    this.lastTime = performance.now();
+    if (this.onUpdate) this.onUpdate(this.currentState);
   }
   public start(route: OptimizedRoute, profile: string = 'driving') {
     this.hasDetectedMotion = false; // Reset gate
@@ -136,13 +122,80 @@ export class NavigationSystem {
 
     this.watchId = navigator.geolocation.watchPosition(
       (pos) => this.handlePositionUpdate(pos),
-      (err) => console.error('[NavigationSystem] GPS Error:', err),
+      (err) => {
+        console.error('[NavigationSystem] GPS_SIGNAL_LOST:', err.message);
+        // Fallback or warning logic
+      },
       {
         enableHighAccuracy: true,
-        timeout: 5000,
+        timeout: 15000,
         maximumAge: 0
       }
     );
+
+    // 2. COMPASS / ORIENTATION TRACKING
+    if (window.DeviceOrientationEvent) {
+      window.addEventListener('deviceorientationabsolute', (e) => this.handleOrientationUpdate(e), true);
+      window.addEventListener('deviceorientation', (e) => this.handleOrientationUpdate(e), true);
+    }
+  }
+
+  private getAverageHeading(newHeading: number): number {
+    this.headingBuffer.push(newHeading);
+    if (this.headingBuffer.length > this.HEADING_BUFFER_SIZE) {
+      this.headingBuffer.shift();
+    }
+    
+    let sumSin = 0;
+    let sumCos = 0;
+    for (const h of this.headingBuffer) {
+      const rad = (h * Math.PI) / 180;
+      sumSin += Math.sin(rad);
+      sumCos += Math.cos(rad);
+    }
+    
+    const avgRad = Math.atan2(sumSin, sumCos);
+    let avgDeg = (avgRad * 180) / Math.PI;
+    if (avgDeg < 0) avgDeg += 360;
+    return avgDeg;
+  }
+
+  private handleOrientationUpdate(e: DeviceOrientationEvent) {
+    if (this.currentState.speed > 1.0) return; // Use GPS heading above 1.0 m/s
+
+    // Throttle orientation updates to max 15Hz (66ms) to prevent UI thread blockage from high-frequency sensor ticks
+    const now = performance.now();
+    if (now - this.lastOrientationTime < 66) return;
+    this.lastOrientationTime = now;
+
+    let heading = 0;
+    if ((e as any).webkitCompassHeading) {
+      heading = (e as any).webkitCompassHeading;
+    } else if (e.alpha !== null) {
+      // For Android/Chrome absolute orientation
+      heading = 360 - e.alpha;
+    } else {
+      return;
+    }
+
+    // Apply angular rolling average to smooth raw device orientation changes
+    const smoothedHeading = this.getAverageHeading(heading);
+    
+    // Standstill compass behavior: use a wider noise gate (5 deg) while stationary to prevent jitter/spinning
+    const isStopped = this.currentState.speed < 0.1 || !this.currentState.isMoving;
+    const noiseGate = isStopped ? 5.0 : 2.0;
+
+    let diff = smoothedHeading - this.currentState.heading;
+    while (diff < -180) diff += 360;
+    while (diff > 180) diff -= 360;
+
+    if (Math.abs(diff) > noiseGate) {
+      // Smoothly blend the new heading using a low-pass filter (heavy blending at standstill)
+      const alpha = isStopped ? 0.08 : 0.35;
+      this.currentState.heading = (this.currentState.heading + diff * alpha + 360) % 360;
+      this.currentState.compassDirection = this.calculateCompassDirection(this.currentState.heading);
+      if (this.onUpdate) this.onUpdate(this.currentState);
+    }
   }
 
   public stop() {
@@ -158,13 +211,17 @@ export class NavigationSystem {
 
   private handlePositionUpdate(pos: GeolocationPosition) {
     const { longitude, latitude, accuracy } = pos.coords;
+    
+    // Update System Monitor with fresh GPS precision
+    systemMonitor.updateGpsAccuracy(Math.round(accuracy));
+
     if (longitude === 0 && latitude === 0) return; // Ignore placeholder/failed coordinates
     
     const now = performance.now();
     const newPos: [number, number] = [longitude, latitude];
 
     // 0. GPS Noise Filtering - Ignore poor accuracy samples if we already have a fix
-    if (this.lastPosition && accuracy > 50) {
+    if (this.lastPosition && accuracy > 200) {
       console.warn('[NavigationSystem] Skipping low accuracy sample:', accuracy);
       return;
     }
@@ -173,6 +230,8 @@ export class NavigationSystem {
       this.lastPosition = newPos;
       this.lastTime = now;
       this.currentState.currentPosition = newPos;
+      // Force immediate jump to current position on first fix
+      if (this.onUpdate) this.onUpdate({ ...this.currentState, isMoving: true });
       return;
     }
 
@@ -183,18 +242,36 @@ export class NavigationSystem {
     // 0.5 GPS Spike Rejection: discard unrealistic jumps (e.g., > 100m in <2s or speed > 50 m/s)
     const maxSpikeSpeed = 50; // m/s (~180 km/h)
     if (rawSpeed > maxSpikeSpeed) {
+      // If we haven't detected real vehicle motion yet, this is the transition from fallback/cached coords to true GPS lock.
+      // Allow it to snap instantly instead of rejecting it!
+      if (!this.hasDetectedMotion) {
+        console.log('[NavigationSystem] Snapping from default position to first true GPS lock:', rawDist, 'm');
+        this.lastPosition = newPos;
+        this.lastTime = now;
+        this.currentState.currentPosition = newPos;
+        this.speedRollingAverage = [];
+        if (this.onUpdate) this.onUpdate(this.currentState);
+        return;
+      }
+
       console.warn('[NavigationSystem] Spike detected, ignoring position update:', rawDist, 'm in', dt, 's');
       // Do not update lastPosition/time to avoid contaminating future calculations
       return;
     }
 
-    // 2. Dead-Zone Logic (Stationary Lock)
-    // If movement is negligible and speed is low, assume stationary to avoid jitter
-    // We use a strict threshold (2.0m) to keep the icon rock-solid but responsive
-    if (rawDist < 2.0 && rawSpeed < this.speedThreshold) {
+    // 2. Dead-Zone Logic (Stationary Lock / GPS Drift filtering)
+    // Exit stationary state if we are currently stationary, but require a stronger confidence threshold to avoid jitter/sliding.
+    const isCurrentlyStationary = !this.currentState.isMoving;
+    const exitStationaryDistanceThreshold = 5.0; // meters
+    const exitStationarySpeedThreshold = 1.2; // m/s (~4.3 km/h)
+    
+    // Enter stationary state if speed drops below 3 km/h (0.833 m/s) and distance is small (< 2.0m)
+    const isEnteringStationary = rawDist < 2.0 && rawSpeed < 0.833;
+    
+    if (isEnteringStationary || (isCurrentlyStationary && rawDist < exitStationaryDistanceThreshold && rawSpeed < exitStationarySpeedThreshold)) {
       this.currentState.isMoving = false;
       this.currentState.speed = 0;
-      this.lastPosition = newPos; // Sync to stop future jumps
+      this.lastPosition = newPos; // Sync to prevent accumulated drift jumps
       this.lastTime = now;
       if (this.onUpdate) this.onUpdate(this.currentState);
       return;
@@ -215,8 +292,8 @@ export class NavigationSystem {
 
     // 5. Heading Calculation with speed-gate
     let clampedHeading = this.currentState.heading;
-    // Only update heading if we are moving at a decent speed (> 2m/s) to avoid "spinning" at stops
-    if (rawDist > 2.5 && smoothedSpeed > 2.0) { 
+    // Relaxed threshold: Update heading if moving > 1.0m at > 0.5m/s
+    if (rawDist > 1.0 && smoothedSpeed > 0.5) { 
       clampedHeading = (Math.atan2(newPos[0] - this.lastPosition[0], newPos[1] - this.lastPosition[1]) * 180) / Math.PI;
     }
 
@@ -225,8 +302,9 @@ export class NavigationSystem {
     // 6. Motion Gate: Stay at start line until real movement is detected
     if (!this.hasDetectedMotion) {
       const distFromStart = this.calculateDistance(this.currentState.currentPosition, smoothedPos);
-      // Require either decent speed or significant distance to "unlock" the vehicle
-      if (smoothedSpeed > 0.5 || distFromStart > 2.0) {
+      // Require either very slight speed or small distance to "unlock" the vehicle
+      // Relaxed to 0.2m to ensure immediate response on most devices
+      if (smoothedSpeed > 0.1 || distFromStart > 0.2) {
         this.hasDetectedMotion = true;
         console.log('[NavigationSystem] Motion detected - Unlocking vehicle icon.');
       } else {
@@ -255,11 +333,15 @@ export class NavigationSystem {
     if (this.route && this.route.coordinates.length >= 2) {
       const snapped = this.snapToRoute(smoothedPos);
       this.currentState.currentPosition = snapped.point;
-      if (snapped.heading !== null && smoothedSpeed > 0.5) {
-        clampedHeading = snapped.heading;
-        this.currentState.heading = clampedHeading;
-        this.currentState.compassDirection = this.calculateCompassDirection(clampedHeading);
+      // 7. Snap heading to road direction if available (higher priority than raw GPS heading)
+      if (snapped) {
+        if (snapped.heading !== null && smoothedSpeed > 0.05) {
+          clampedHeading = snapped.heading;
+        }
       }
+
+      this.currentState.heading = clampedHeading;
+      this.currentState.compassDirection = this.calculateCompassDirection(clampedHeading);
     }
 
     // 8. Maneuver & Step Tracking
@@ -422,22 +504,8 @@ export class NavigationSystem {
     return minDistance < 40 ? { point: snappedPoint, heading: snappedHeading } : { point: pos, heading: null };
   }
 
-  private scanForProactiveHazards(currentPos: [number, number]) {
-    // Proximity scanning logic (Requirement 3)
-    // In production, this pulls from the IntelligenceManager
-    const nearbyHazards = intelligence.getNearbyHazards(currentPos, 500);
-    
-    nearbyHazards.forEach(hazard => {
-      const dist = this.calculateDistance(currentPos, hazard.location);
-      const hazardKey = `${hazard.id}_alert`;
-      
-      if (dist < 300 && !this.announcedHazards.has(hazardKey)) {
-        this.announcedHazards.add(hazardKey);
-        if (this.onProactiveAlert) {
-          this.onProactiveAlert(hazard.type, Math.round(dist));
-        }
-      }
-    });
+  private scanForProactiveHazards(_currentPos: [number, number]) {
+    // Proximity scanning logic goes here
   }
 
   private projectPointOnSegment(p: [number, number], a: [number, number], b: [number, number]): [number, number] {
@@ -498,6 +566,11 @@ export class NavigationSystem {
     const utterance = new SpeechSynthesisUtterance(text);
     
     utterance.onend = () => {
+      this.isSpeaking = false;
+      this.processVoiceQueue();
+    };
+    
+    utterance.onerror = () => {
       this.isSpeaking = false;
       this.processVoiceQueue();
     };

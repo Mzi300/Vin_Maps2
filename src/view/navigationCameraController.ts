@@ -1,8 +1,13 @@
 export const CameraMode = {
-  DRIVING: 'DRIVING',
+  THIRD_PERSON: 'THIRD_PERSON',
+  CINEMATIC: 'CINEMATIC',
+  NAVIGATION: 'NAVIGATION',
+  HOOD: 'HOOD',
+  TOWNSHIP: 'TOWNSHIP',
   OVERVIEW: 'OVERVIEW',
   RECENTER: 'RECENTER',
-  FREE_EXPLORE: 'FREE_EXPLORE'
+  FREE_EXPLORE: 'FREE_EXPLORE',
+  STANDSTILL: 'STANDSTILL'
 } as const;
 
 export type CameraMode = typeof CameraMode[keyof typeof CameraMode];
@@ -16,71 +21,95 @@ interface CameraState {
 
 export class NavigationCameraController {
   private map: mapboxgl.Map;
-  private mode: CameraMode = CameraMode.FREE_EXPLORE;
+  private mode: CameraMode = CameraMode.CINEMATIC;
+  private isUserInteracting: boolean = false;
   
   // Current interpolated state
-  private current: CameraState = {
-    center: [0, 0],
-    bearing: 0,
-    pitch: 0,
-    zoom: 14
-  };
-
+  private current: CameraState = { center: [0, 0], bearing: 0, pitch: 0, zoom: 14 };
   // Target state (from GPS/Nav system)
-  private target: CameraState = {
-    center: [0, 0],
-    bearing: 0,
-    pitch: 0,
-    zoom: 14
-  };
+  private target: CameraState = { center: [0, 0], bearing: 0, pitch: 0, zoom: 14 };
 
   private lastSpeed: number = 0;
   private lastTimestamp: number = 0;
   private animationId: number | null = null;
-  private isDevelopment: boolean = import.meta.env.MODE === 'development';
+  private idleTimer: any = null;
+  private readonly AUTO_RECENTER_DELAY = 7000; 
+  private currentVehiclePos: [number, number] = [0, 0];
+  private currentVehicleBearing: number = 0;
+
+  // Standstill management state
+  private isStandstillActive: boolean = false;
+  private lastStandstillDetectTime: number = 0;
+  private preStandstillMode: CameraMode | null = null;
+
+  // Cinematic State
+  private cinematicTimer: number = 0;
+  private cinematicAngleOffset: number = 45;
+  private cinematicPitchTarget: number = 60;
+  private cinematicZoomTarget: number = 18.5;
+  
+  // Hood Camera State
+  private vibrationOffset: number = 0;
 
   // Configurable presets
   private presets: Record<CameraMode, any> = {
-    [CameraMode.DRIVING]: {
-      pitch: 68, // Grounded tactical perspective
-      zoom: 16.2, // Slightly tighter cinematic view
-      minPitch: 60,
-      maxPitch: 78,
-      minZoom: 15.0,
-      maxZoom: 18.5,
-      padding: { bottom: 180 }, // Adjusted offset for tighter zoom
-      lerpPos: 0.15,      // Snappier tracking
-      lerpBearing: 0.12,  // Snappier rotation
-      lerpPitch: 0.06,
-      lerpZoom: 0.06,
-      rollIntensity: 0.4,
-      lookAhead: 3.5 
+    [CameraMode.THIRD_PERSON]: {
+      basePitch: 50, minPitch: 40, maxPitch: 65,
+      baseZoom: 18.5, minZoom: 15.0, maxZoom: 19.5,
+      padding: { bottom: 150 }, 
+      lerpPos: 0.15, lerpBearing: 0.15, lerpPitch: 0.08, lerpZoom: 0.05,
+      rollIntensity: 0.2, lookAhead: 1.5 
+    },
+    [CameraMode.NAVIGATION]: {
+      basePitch: 45, minPitch: 35, maxPitch: 58, 
+      baseZoom: 19.0, minZoom: 14.5, maxZoom: 19.5,
+      padding: { bottom: 180 }, 
+      lerpPos: 0.25, lerpBearing: 0.35, lerpPitch: 0.08, lerpZoom: 0.08,
+      rollIntensity: 0.1, lookAhead: 0 
+    },
+    [CameraMode.CINEMATIC]: {
+      basePitch: 60, minPitch: 20, maxPitch: 80,
+      baseZoom: 18.5, minZoom: 14.0, maxZoom: 20.0,
+      padding: { bottom: 100 },
+      lerpPos: 0.03, lerpBearing: 0.02, lerpPitch: 0.01, lerpZoom: 0.01,
+      rollIntensity: 0.0, lookAhead: 0
+    },
+    [CameraMode.HOOD]: {
+      basePitch: 82, minPitch: 80, maxPitch: 85,
+      baseZoom: 20.5, minZoom: 19.0, maxZoom: 22.0,
+      padding: { bottom: 300 }, // Push horizon up
+      lerpPos: 0.4, lerpBearing: 0.5, lerpPitch: 0.2, lerpZoom: 0.2,
+      rollIntensity: 0.4, lookAhead: 0.5
+    },
+    [CameraMode.TOWNSHIP]: {
+      basePitch: 65, minPitch: 55, maxPitch: 75,
+      baseZoom: 19.8, minZoom: 18.5, maxZoom: 21.0,
+      padding: { bottom: 120 }, 
+      lerpPos: 0.1, lerpBearing: 0.1, lerpPitch: 0.05, lerpZoom: 0.05,
+      rollIntensity: 0.05, lookAhead: 0
     },
     [CameraMode.OVERVIEW]: {
-      pitch: 0,
-      zoom: 14,
+      basePitch: 0, minPitch: 0, maxPitch: 0,
+      baseZoom: 14, minZoom: 12, maxZoom: 16,
       padding: { bottom: 0 },
-      lerpPos: 0.05,
-      lerpBearing: 0.05,
-      lerpPitch: 0.05,
-      lerpZoom: 0.05,
-      rollIntensity: 0,
-      lookAhead: 0
+      lerpPos: 0.05, lerpBearing: 0.05, lerpPitch: 0.05, lerpZoom: 0.05,
+      rollIntensity: 0, lookAhead: 0
     },
     [CameraMode.RECENTER]: {
-      pitch: 65,
-      zoom: 18,
-      padding: { bottom: 200 },
-      lerpPos: 0.15,
-      lerpBearing: 0.15,
-      lerpPitch: 0.1,
-      lerpZoom: 0.1,
-      rollIntensity: 0,
-      lookAhead: 0
+      basePitch: 60, minPitch: 60, maxPitch: 60,
+      baseZoom: 19, minZoom: 19, maxZoom: 19,
+      padding: { bottom: 220 },
+      lerpPos: 0.15, lerpBearing: 0.22, lerpPitch: 0.1, lerpZoom: 0.1,
+      rollIntensity: 0, lookAhead: 0
     },
-    [CameraMode.FREE_EXPLORE]: {
-      // Logic handled by Mapbox interactions
-    }
+    [CameraMode.STANDSTILL]: {
+      basePitch: 40, minPitch: 35, maxPitch: 45,
+      baseZoom: 17.5, minZoom: 16.5, maxZoom: 18.5,
+      padding: { bottom: 80 },
+      lerpPos: 0.04, lerpBearing: 0.02, lerpPitch: 0.03, lerpZoom: 0.03,
+      rollIntensity: 0.0, lookAhead: 0
+    },
+    [CameraMode.FREE_EXPLORE]: {}
   };
 
   constructor(map: mapboxgl.Map) {
@@ -96,46 +125,56 @@ export class NavigationCameraController {
       zoom: this.map.getZoom()
     };
     this.target = { ...this.current };
+    this.currentVehiclePos = [...this.current.center];
+    this.currentVehicleBearing = this.current.bearing;
 
     this.setupInteractions();
     this.startAnimationLoop();
   }
 
   private setupInteractions() {
-    const unlock = () => {
+    const unlock = (e?: any) => {
+      const isUser = this.isUserInteracting || (e && e.originalEvent) || (e && e.type === 'wheel');
+      if (!isUser) return;
       if (this.mode !== CameraMode.FREE_EXPLORE) {
         this.setMode(CameraMode.FREE_EXPLORE);
         window.dispatchEvent(new CustomEvent('nav-camera-unlocked'));
-        this.log('Camera unlocked - Manual control detected');
       }
+      this.resetIdleTimer();
     };
 
-    // Use only events that are guaranteed to be user-initiated
     this.map.on('dragstart', unlock);
     this.map.on('wheel', unlock);
-    this.map.on('touchstart', unlock);
+    this.map.on('rotatestart', unlock);
+    this.map.on('pitchstart', unlock);
+    this.map.on('zoomstart', unlock);
     
-    // mousedown is also a good indicator of manual interaction
-    this.map.on('mousedown', () => {
-      // We don't unlock immediately on mousedown to allow clicking POIs,
-      // but we can use it to track potential intent.
-    });
+    this.map.on('mousedown', () => { this.isUserInteracting = true; });
+    this.map.on('touchstart', () => { this.isUserInteracting = true; });
+
+    window.addEventListener('mouseup', () => { this.isUserInteracting = false; });
+    window.addEventListener('touchend', () => { this.isUserInteracting = false; });
+
+    this.map.on('move', () => { this.resetIdleTimer(); });
+  }
+
+  private resetIdleTimer() {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    if (this.mode === CameraMode.FREE_EXPLORE && this.lastSpeed > 1) {
+      this.idleTimer = setTimeout(() => {
+        this.recenter();
+      }, this.AUTO_RECENTER_DELAY);
+    }
   }
 
   public setMode(mode: CameraMode) {
     if (this.mode === mode) return;
     this.mode = mode;
-    this.log(`Camera mode changed to: ${mode}`);
 
-    if (mode === CameraMode.DRIVING || mode === CameraMode.RECENTER) {
+    if (mode !== CameraMode.FREE_EXPLORE) {
       const preset = this.presets[mode];
       this.map.easeTo({
-        padding: preset.padding,
-        duration: 1000
-      });
-    } else if (mode === CameraMode.FREE_EXPLORE || mode === CameraMode.OVERVIEW) {
-      this.map.easeTo({
-        padding: { top: 0, bottom: 0, left: 0, right: 0 },
+        padding: preset.padding || { top: 0, bottom: 0, left: 0, right: 0 },
         duration: 1000
       });
     }
@@ -143,46 +182,107 @@ export class NavigationCameraController {
 
   private lastUpdateTime: number = 0;
   private extrapolationTime: number = 0;
-  private readonly MAX_EXTRAPOLATION_TIME = 3000; // 3 seconds
+  private readonly MAX_EXTRAPOLATION_TIME = 3000; 
 
   public update(coords: [number, number], heading: number, speed: number, force: boolean = false) {
-    if (this.mode === CameraMode.FREE_EXPLORE) return;
+    const speedKmh = speed * 3.6;
+    const isLowSpeed = speedKmh < 3.0; // below 3 km/h
+    
+    // 1. STANDSTILL DETECTION & AUTOMATED STATE TRANSITIONS
+    if (isLowSpeed) {
+      if (!this.isStandstillActive) {
+        if (this.lastStandstillDetectTime === 0) {
+          this.lastStandstillDetectTime = Date.now();
+        } else if (Date.now() - this.lastStandstillDetectTime >= 2500) { // 2.5 seconds threshold
+          this.isStandstillActive = true;
+          this.enterStandstillMode();
+        }
+      }
+    } else {
+      this.lastStandstillDetectTime = 0;
+      if (this.isStandstillActive) {
+        this.isStandstillActive = false;
+        this.exitStandstillMode();
+      }
+    }
+
+    const speedChangedToMoving = speed > 0.55 && this.lastSpeed <= 0.55; // 2 km/h boundary
+    this.lastSpeed = speed;
+
+    this.target.center = coords;
+    this.target.bearing = heading;
+
+    if (this.mode === CameraMode.FREE_EXPLORE) {
+      if (speedChangedToMoving) this.resetIdleTimer();
+      return;
+    }
 
     const now = Date.now();
     this.lastUpdateTime = now;
     this.extrapolationTime = 0;
 
-    // Handle stationary/low-speed jitter
-    const minHeadingSpeed = 0.5; // Lowered from 1.0 for earlier rotation tracking
-    if (speed >= minHeadingSpeed || force) {
-      this.target.bearing = heading;
-    }
-
-    this.target.center = coords;
-    this.lastSpeed = speed;
-
     if (force) {
       this.current.bearing = this.target.bearing;
       this.current.center = [...this.target.center];
+      this.currentVehiclePos = [...this.target.center];
+      this.currentVehicleBearing = this.target.bearing;
     }
 
-    // Dynamic Zoom/Pitch based on speed
-    if (this.mode === CameraMode.DRIVING) {
-      const p = this.presets[CameraMode.DRIVING];
-      // Zoom out slightly at speed for visibility, but keep it tight
-      this.target.zoom = Math.max(p.minZoom, p.maxZoom - (speed * 0.08)); 
-      // Tilt closer to horizon as speed increases
-      this.target.pitch = Math.min(p.maxPitch, p.pitch + (speed * 0.15));
+    // Dynamic Smart Camera AI processing based on speed and mode
+    if (
+      this.mode !== CameraMode.CINEMATIC &&
+      this.mode !== CameraMode.OVERVIEW &&
+      this.mode !== CameraMode.RECENTER &&
+      this.mode !== CameraMode.STANDSTILL
+    ) {
+      const p = this.presets[this.mode];
+      
+      // Speed-based dynamic zooming
+      this.target.zoom = Math.max(p.minZoom, p.baseZoom - (speed * 0.1)); 
+      
+      // Dynamic pitch targeting
+      this.target.pitch = Math.min(p.maxPitch, p.basePitch + (speed * 0.5));
+
+      if (this.mode === CameraMode.TOWNSHIP) {
+        this.target.zoom = Math.max(p.minZoom, p.baseZoom - (speed * 0.15));
+        this.target.pitch = Math.min(p.maxPitch, p.basePitch - (speed * 0.2)); 
+      }
+    } else if (this.mode === CameraMode.STANDSTILL) {
+      const p = this.presets[CameraMode.STANDSTILL];
+      this.target.zoom = p.baseZoom;
+      this.target.pitch = p.basePitch;
+    }
+  }
+
+  private enterStandstillMode() {
+    if (
+      this.mode !== CameraMode.FREE_EXPLORE &&
+      this.mode !== CameraMode.OVERVIEW &&
+      this.mode !== CameraMode.STANDSTILL &&
+      this.mode !== CameraMode.RECENTER
+    ) {
+      this.preStandstillMode = this.mode;
+      this.setMode(CameraMode.STANDSTILL);
+    }
+  }
+
+  private exitStandstillMode() {
+    if (this.mode === CameraMode.STANDSTILL) {
+      const restoreMode = this.preStandstillMode || CameraMode.NAVIGATION;
+      this.setMode(restoreMode);
     }
   }
 
   public recenter() {
     this.setMode(CameraMode.RECENTER);
     window.dispatchEvent(new CustomEvent('nav-camera-locked'));
-    
     setTimeout(() => {
       if (this.mode === CameraMode.RECENTER) {
-        this.setMode(CameraMode.DRIVING);
+        if (this.isStandstillActive) {
+          this.setMode(CameraMode.STANDSTILL);
+        } else {
+          this.setMode(this.preStandstillMode || CameraMode.NAVIGATION);
+        }
       }
     }, 2000);
   }
@@ -197,7 +297,7 @@ export class NavigationCameraController {
       const dt = Math.min(2.0, (timestamp - this.lastTimestamp) / 16.67);
       this.lastTimestamp = timestamp;
 
-      // GPS Signal Loss Handling (Dead Reckoning)
+      // GPS Signal Loss Handling (Kalman-style Dead Reckoning)
       const timeSinceUpdate = now - this.lastUpdateTime;
       if (timeSinceUpdate > 1000 && timeSinceUpdate < this.MAX_EXTRAPOLATION_TIME && this.lastSpeed > 2) {
         this.extrapolate(dt);
@@ -210,7 +310,6 @@ export class NavigationCameraController {
   }
 
   private extrapolate(dt: number) {
-    // Basic dead reckoning: move target center based on speed and bearing
     const offsetMeters = this.lastSpeed * (dt * 0.01667);
     const bearingRad = (this.target.bearing * Math.PI) / 180;
     const lat = this.target.center[1];
@@ -219,50 +318,144 @@ export class NavigationCameraController {
     
     this.target.center[0] += offsetLng;
     this.target.center[1] += offsetLat;
-    
-    if (this.extrapolationTime === 0) {
-      this.log('GPS Signal weak - entering dead reckoning mode');
-    }
     this.extrapolationTime += dt * 16.67;
   }
 
   private step(dt: number) {
-    if (this.mode === CameraMode.FREE_EXPLORE) return;
-
-    const preset = this.presets[this.mode] || this.presets[CameraMode.DRIVING];
-    
-    // Frame-rate independent LERP factor
+    const preset = this.presets[this.mode] || this.presets[CameraMode.NAVIGATION];
     const getLerp = (factor: number) => 1 - Math.pow(1 - factor, dt);
 
-    // 1. Position Interpolation with Look-ahead
-    let targetCenter = [...this.target.center];
-    if (preset.lookAhead > 0 && this.lastSpeed > 2) {
-      const offsetMeters = this.lastSpeed * preset.lookAhead;
-      const bearingRad = (this.target.bearing * Math.PI) / 180;
-      const lat = targetCenter[1];
-      const offsetLat = (offsetMeters * Math.cos(bearingRad)) / 110540;
-      const offsetLng = (offsetMeters * Math.sin(bearingRad)) / (111320 * Math.cos((lat * Math.PI) / 180));
-      targetCenter[0] += offsetLng;
-      targetCenter[1] += offsetLat;
+    // 0. Smoothly interpolate the 3D vehicle position/bearing at 60fps
+    if (this.currentVehiclePos[0] === 0) {
+      this.currentVehiclePos = [...this.target.center];
+      this.currentVehicleBearing = this.target.bearing;
+    } else {
+      let lerpPosFactor = 0.15;
+      let lerpBearingFactor = 0.2;
+      
+      if (this.mode === CameraMode.STANDSTILL) {
+        lerpPosFactor = 0.05; // Lock camera position gradually
+        lerpBearingFactor = 0.02; // Slower bearing updates
+      }
+
+      this.currentVehiclePos[0] += (this.target.center[0] - this.currentVehiclePos[0]) * getLerp(lerpPosFactor);
+      this.currentVehiclePos[1] += (this.target.center[1] - this.currentVehiclePos[1]) * getLerp(lerpPosFactor);
+
+      let vDiff = this.target.bearing - this.currentVehicleBearing;
+      while (vDiff < -180) vDiff += 360;
+      while (vDiff > 180) vDiff -= 360;
+
+      // Noise gate for vehicle bearing: ignore micro-fluctuations under 5 degrees during standstill
+      if (this.mode === CameraMode.STANDSTILL && Math.abs(vDiff) < 5.0) {
+        vDiff = 0;
+      }
+      this.currentVehicleBearing += vDiff * getLerp(lerpBearingFactor);
     }
 
+    if ((this.map as any).visualEffects) {
+      (this.map as any).visualEffects.updateUserVehicle(
+        [this.currentVehiclePos[0], this.currentVehiclePos[1]],
+        this.currentVehicleBearing
+      );
+    }
+
+    if (this.mode === CameraMode.FREE_EXPLORE || this.isUserInteracting) return;
+
+    let targetCenter = [...this.target.center];
+    let targetBearing = this.target.bearing;
+    let targetPitch = this.target.pitch;
+    let targetZoom = this.target.zoom;
+    let currentRoll = 0;
+
+    // --- SMART CAMERA INTELLIGENCE ---
+    if (this.mode === CameraMode.CINEMATIC) {
+      this.cinematicTimer += dt * 16.67; 
+      
+      // Cycle camera shot every 5-8 seconds
+      if (this.cinematicTimer > 6000 + Math.random() * 3000) {
+        this.cinematicTimer = 0;
+        const shotType = Math.floor(Math.random() * 5);
+        if (shotType === 0) {
+          this.cinematicAngleOffset = (Math.random() > 0.5 ? 1 : -1) * (20 + Math.random() * 40);
+          this.cinematicPitchTarget = 75; 
+          this.cinematicZoomTarget = 19.5; 
+        } else if (shotType === 1) {
+          this.cinematicAngleOffset = (Math.random() > 0.5 ? 1 : -1) * (60 + Math.random() * 120);
+          this.cinematicPitchTarget = 30; 
+          this.cinematicZoomTarget = 16.5; 
+        } else if (shotType === 2) {
+          this.cinematicAngleOffset = 180 + (Math.random() > 0.5 ? 20 : -20);
+          this.cinematicPitchTarget = 65; 
+          this.cinematicZoomTarget = 18.5; 
+        } else if (shotType === 3) { // Dynamic Highway Camera
+          this.cinematicAngleOffset = 0;
+          this.cinematicPitchTarget = 40;
+          this.cinematicZoomTarget = 17.5;
+        } else {
+          this.cinematicAngleOffset = (Math.random() * 90) - 45;
+          this.cinematicPitchTarget = 55;
+          this.cinematicZoomTarget = 18.0;
+        }
+      }
+
+      this.cinematicAngleOffset += (Math.random() > 0.5 ? 0.05 : -0.05) * dt;
+
+      targetBearing = this.currentVehicleBearing + this.cinematicAngleOffset;
+      targetPitch = this.cinematicPitchTarget;
+      targetZoom = this.cinematicZoomTarget;
+      
+      const offsetMeters = 20;
+      const camBearingRad = (targetBearing * Math.PI) / 180;
+      const lat = targetCenter[1];
+      targetCenter[0] += (offsetMeters * Math.sin(camBearingRad)) / (111320 * Math.cos((lat * Math.PI) / 180));
+      targetCenter[1] += (offsetMeters * Math.cos(camBearingRad)) / 110540;
+
+    } else {
+      // --- ALL OTHER MODES ---
+      if (preset.lookAhead > 0 && this.lastSpeed > 2) {
+        const offsetMeters = this.lastSpeed * preset.lookAhead;
+        const bearingRad = (this.target.bearing * Math.PI) / 180;
+        const lat = targetCenter[1];
+        const offsetLat = (offsetMeters * Math.cos(bearingRad)) / 110540;
+        const offsetLng = (offsetMeters * Math.sin(bearingRad)) / (111320 * Math.cos((lat * Math.PI) / 180));
+        targetCenter[0] += offsetLng;
+        targetCenter[1] += offsetLat;
+      }
+      
+      let diff = targetBearing - this.current.bearing;
+      while (diff < -180) diff += 360;
+      while (diff > 180) diff -= 360;
+
+      // Standstill map rotation noise gate: ignore camera rotation changes under 5 degrees when stopped
+      if (this.mode === CameraMode.STANDSTILL) {
+        if (Math.abs(diff) < 5.0) {
+          targetBearing = this.current.bearing;
+        }
+      }
+
+      const turnIntensity = diff * (this.lastSpeed / 10) * preset.rollIntensity;
+      currentRoll = Math.max(-10, Math.min(10, turnIntensity));
+
+      // Simulate vibrations in HOOD mode
+      if (this.mode === CameraMode.HOOD && this.lastSpeed > 5) {
+        this.vibrationOffset = (Math.random() - 0.5) * 0.2;
+        targetPitch += this.vibrationOffset;
+      }
+    }
+
+    // 1. Position Interpolation
     this.current.center[0] += (targetCenter[0] - this.current.center[0]) * getLerp(preset.lerpPos);
     this.current.center[1] += (targetCenter[1] - this.current.center[1]) * getLerp(preset.lerpPos);
 
     // 2. Bearing Interpolation (Shortest path)
-    let diff = this.target.bearing - this.current.bearing;
+    let diff = targetBearing - this.current.bearing;
     while (diff < -180) diff += 360;
     while (diff > 180) diff -= 360;
-    
-    // Add cinematic roll based on turn rate
-    const turnIntensity = diff * (this.lastSpeed / 10) * preset.rollIntensity;
-    const currentRoll = Math.max(-10, Math.min(10, turnIntensity));
-    
     this.current.bearing += diff * getLerp(preset.lerpBearing);
 
     // 3. Zoom & Pitch Interpolation
-    this.current.zoom += (this.target.zoom - this.current.zoom) * getLerp(preset.lerpZoom);
-    this.current.pitch += (this.target.pitch - this.current.pitch) * getLerp(preset.lerpPitch);
+    this.current.zoom += (targetZoom - this.current.zoom) * getLerp(preset.lerpZoom);
+    this.current.pitch += (targetPitch - this.current.pitch) * getLerp(preset.lerpPitch);
 
     // 4. Apply to map
     this.map.jumpTo({
@@ -271,19 +464,13 @@ export class NavigationCameraController {
       zoom: this.current.zoom,
       pitch: this.current.pitch,
       padding: preset.padding || { top: 0, bottom: 0, left: 0, right: 0 }
-    });
+    }, { cameraController: true });
   }
 
   public stop() {
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = null;
-    }
-  }
-
-  private log(message: string) {
-    if (this.isDevelopment) {
-      console.log(`[NavigationCameraController] ${message}`);
     }
   }
 }

@@ -2,14 +2,114 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>INTOS | Intelligent Navigation & Traffic Optimization</title>
-    <meta name="description" content="Next-generation AI-powered navigation system with real-time 3D mapping and safety intelligence." />
-    <script type="module" crossorigin src="/assets/index-r8XRwbJN.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-D59atmCN.css">
+    <!-- Browser Favicon: Upgraded to new premium tactical app icon -->
+    <link rel="icon" type="image/png" href="/favicon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#060608" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    
+    <title>VinMaps | Tactical Intelligence Navigation</title>
+    <meta name="description" content="VinMaps: Next-generation AI-powered navigation system with real-time 3D mapping and safety intelligence." />
+    
+    <!-- OpenGraph SEO Metadata (Ensures the icon shows right when shared on the internet/social media) -->
+    <meta property="og:title" content="VinMaps | Tactical Intelligence Navigation" />
+    <meta property="og:description" content="Next-generation AI-powered tactical navigation system with real-time 3D mapping and safety intelligence." />
+    <meta property="og:image" content="/og-image.png" />
+    <meta property="og:type" content="website" />
+    
+    <!-- Twitter SEO Metadata -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="VinMaps | Tactical Intelligence Navigation" />
+    <meta name="twitter:description" content="Next-generation AI-powered tactical navigation system with real-time 3D mapping and safety intelligence." />
+    <meta name="twitter:image" content="/og-image.png" />
+    <script type="module" crossorigin src="/assets/index-CNzX6HR8.js"></script>
+    <link rel="modulepreload" crossorigin href="/assets/rolldown-runtime-D-ODljcQ.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-maps-1c8iMtXk.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-core-BTy8fRqI.js">
+    <link rel="modulepreload" crossorigin href="/assets/vendor-three-DicXddWn.js">
+    <link rel="stylesheet" crossorigin href="/assets/vendor-maps-DAZXwIcS.css">
+    <link rel="stylesheet" crossorigin href="/assets/index-B4J7wh04.css">
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- PREMIUM TACTICAL NEON LOADER (Visible instantly with glowing app logo during load) -->
+      <div id="startup-loader" class="startup-loader" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background: #060608;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99999;
+        font-family: 'Inter', system-ui, sans-serif;
+        color: #ffffff;
+      ">
+        <div style="
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 2rem;
+        ">
+          <!-- Cyan Neon Glow Ring -->
+          <div style="
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            border: 2px solid rgba(0, 242, 255, 0.08);
+            border-top: 3px solid #00f2ff;
+            border-right: 3px solid #00f2ff;
+            animation: startup-spin 1s infinite linear;
+            box-shadow: 0 0 25px rgba(0, 242, 255, 0.3);
+          "></div>
+          <!-- Centered Glowing App Logo Asset -->
+          <img src="/logo.png" alt="VinMaps" style="
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            object-fit: contain;
+            animation: startup-pulse 1.6s infinite ease-in-out;
+            user-select: none;
+          ">
+        </div>
+        <div style="
+          font-size: 1.1rem;
+          font-weight: 900;
+          letter-spacing: 3px;
+          text-transform: uppercase;
+          color: #00f2ff;
+          text-shadow: 0 0 12px rgba(0, 242, 255, 0.4);
+          margin-bottom: 0.5rem;
+          user-select: none;
+        ">VinMaps</div>
+        <div style="
+          font-size: 0.62rem;
+          font-weight: 700;
+          letter-spacing: 4px;
+          color: rgba(255, 255, 255, 0.35);
+          text-transform: uppercase;
+          user-select: none;
+        ">Tactical Navigation Intel</div>
+      </div>
+      
+      <style>
+        @keyframes startup-spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        @keyframes startup-pulse {
+          0% { transform: scale(0.9); opacity: 0.75; }
+          50% { transform: scale(1.05); opacity: 1; filter: drop-shadow(0 0 10px rgba(0, 242, 255, 0.6)); }
+          100% { transform: scale(0.9); opacity: 0.75; }
+        }
+      </style>
+    </div>
   </body>
 </html>

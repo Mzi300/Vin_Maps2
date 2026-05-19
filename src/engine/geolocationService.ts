@@ -37,7 +37,7 @@ export class GeolocationService {
         },
         {
           enableHighAccuracy: true,
-          timeout: 8000, // Sync with 8s tactical window for resilience
+          timeout: 15000, // Sync with 15s tactical window for resilience
           maximumAge: 0 
         }
       );

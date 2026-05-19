@@ -15,9 +15,10 @@ export class SensorIntelligence {
   public start() {
     if (this.isMonitoring) return;
     
-    // Request permission for iOS 13+ devices
-    if (typeof (DeviceMotionEvent as any).requestPermission === 'function') {
-      (DeviceMotionEvent as any).requestPermission()
+    // Request permission for iOS 13+ devices safely without throwing ReferenceError
+    const DeviceMotionEventClass = (window as any).DeviceMotionEvent;
+    if (DeviceMotionEventClass && typeof DeviceMotionEventClass.requestPermission === 'function') {
+      DeviceMotionEventClass.requestPermission()
         .then((permissionState: string) => {
           if (permissionState === 'granted') {
             this.initListeners();

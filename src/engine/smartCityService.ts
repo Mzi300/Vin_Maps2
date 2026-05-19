@@ -1,5 +1,3 @@
-import { systemMonitor } from './systemMonitor';
-
 export interface TrafficSignal {
   id: string;
   location: [number, number];
@@ -28,21 +26,40 @@ export class SmartCityService {
   }
 
   private async startPolling() {
-    // Poll every 3 seconds for infrastructure updates
-    setInterval(async () => {
+    let failureCount = 0;
+    
+    const poll = async () => {
+      const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000');
+      
+      if (!backendUrl) {
+        // Standalone production mode: run simulation directly without network request
+        this.generateSimulatedSignals();
+        setTimeout(poll, 30000);
+        return;
+      }
+
       try {
-        const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
         const res = await fetch(`${backendUrl}/smart-city/signals`);
         if (res.ok) {
           const signals = await res.json();
           this.signals = new Map(signals.map((s: any) => [s.id, s]));
           if (this.onUpdate) this.onUpdate(Array.from(this.signals.values()));
+          failureCount = 0;
+        } else {
+          this.generateSimulatedSignals();
+          failureCount++;
         }
       } catch (e) {
-        // Fallback: Generate simulated local signals if backend is offline (Degraded Mode)
         this.generateSimulatedSignals();
+        failureCount++;
       }
-    }, 3000);
+
+      // Backoff delay: if backend fails multiple times, slow down to avoid spamming the console
+      const nextDelay = failureCount > 3 ? 30000 : 5000;
+      setTimeout(poll, nextDelay);
+    };
+
+    setTimeout(poll, 1000);
   }
 
   private generateSimulatedSignals() {

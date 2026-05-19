@@ -6,8 +6,24 @@ export class RealtimeService {
   private static instance: RealtimeService;
 
   private constructor() {
-    const backendUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
-    this.socket = io(backendUrl);
+    const backendUrl = import.meta.env.VITE_BACKEND_URL || (import.meta.env.PROD ? '' : 'http://localhost:3000');
+    
+    if (!backendUrl) {
+      console.warn('[RealtimeService] Running in standalone tactical mode. Realtime sync disabled.');
+      this.socket = {
+        on: () => this,
+        emit: () => this,
+        connect: () => this,
+        disconnect: () => this
+      } as any;
+      return;
+    }
+
+    this.socket = io(backendUrl, {
+      reconnectionAttempts: 5,
+      reconnectionDelay: 10000,
+      timeout: 5000
+    });
 
     this.socket.on('connect', () => {
       console.log('[RealtimeService] Tactical link established');

@@ -11,9 +11,8 @@ export class MapRenderer {
   public cameraController!: NavigationCameraController;
   private styleLoadedPromise: Promise<void>;
   private resolveStyleLoaded!: () => void;
-  private isNavigationMode: boolean = false;
+  private onStyleReadyCallback?: () => void;
 
-  private styleLoaded: boolean = false;
   private initialCenter: [number, number] = [28.0473, -26.2041];
 
   constructor(containerId: string, token: string, center?: [number, number]) {
@@ -29,85 +28,153 @@ export class MapRenderer {
   private initMap(token: string) {
     mapboxgl.accessToken = token;
 
-    // 1. Initialise with Mapbox Standard for photo‑realistic 3D
-    this.map = new mapboxgl.Map({
-      container: this.containerId,
-      style: 'mapbox://styles/mapbox/standard',
-      center: this.initialCenter, // Tactical center
-      zoom: 16.2,                  // Tightened cinematic zoom
-      pitch: 68,                   // Tightened cinematic perspective
-      bearing: 0,                  // Forward facing
+    // Detect mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-      antialias: true,
-      interactive: true,
-      maxBounds: [
-        [16.3449, -34.8191],
-        [32.8912, -22.1265]
-      ]
-    });
+    // 1. WebGL Support Fallback Guard
+    if (!mapboxgl.supported()) {
+      console.error('[MapRenderer] WebGL not supported on this device/browser');
+      const container = document.getElementById(this.containerId);
+      if (container) {
+        container.innerHTML = `
+          <div style="padding: 20px; color: white; background: #0b0c10; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; font-family: sans-serif; border: 1px solid #1f2833; box-sizing: border-box;">
+            <span style="font-size: 3rem; margin-bottom: 15px;">⚠️</span>
+            <h3 style="margin: 0 0 10px 0; color: #00f2ff; text-shadow: 0 0 10px rgba(0,242,255,0.5);">WebGL ACCELERATION REQUIRED</h3>
+            <p style="margin: 0 0 20px 0; font-size: 0.9rem; max-width: 300px; opacity: 0.8; line-height: 1.4;">
+              VinMaps requires WebGL hardware acceleration to load high-fidelity road layouts and telemetry.
+            </p>
+            <p style="font-size: 0.8rem; opacity: 0.6; max-width: 280px; line-height: 1.4;">
+              Please enable "Hardware Acceleration" in your browser settings or update your Android System WebView.
+            </p>
+          </div>
+        `;
+      }
+      setTimeout(() => {
+        this.resolveStyleLoaded();
+        if (this.onStyleReadyCallback) this.onStyleReadyCallback();
+      }, 500);
+      return;
+    }
 
-    this.map.on('style.load', () => {
-      this.visualEffects = new VisualEffects(this.map);
-      this.cameraController = new NavigationCameraController(this.map);
-
-      // 2. Cinematic lighting (dusk)
-      this.map.setConfigProperty('basemap', 'lightPreset', 'dusk');
-      this.map.setConfigProperty('basemap', 'showLandmarks', true);
-      this.map.setConfigProperty('basemap', 'show3dObjects', true);
-
-      // 3. Tactical road overlay
-      this.injectTacticalRoads();
-
-      // 4. Atmosphere (fog)
-      this.map.setFog({
-        range: [0.5, 4],
-        color: '#050505',
-        'high-color': '#00f2ff',
-        'space-color': '#000000',
-        'horizon-blend': 0.05
+    try {
+      // 2. Initialise Mapbox Map (Adaptive options for mobile compatibility)
+      this.map = new mapboxgl.Map({
+        container: this.containerId,
+        style: 'mapbox://styles/mapbox/standard',
+        center: this.initialCenter,
+        zoom: isMobile ? 16.5 : 18.2, // Slightly zoomed out on mobile for better initial performance
+        pitch: isMobile ? 55 : 72,     // Lower pitch on mobile to reduce render load
+        bearing: 0,
+        antialias: !isMobile,          // Disable antialias on mobile for massive rendering speedup
+        interactive: true,
+        failIfMajorPerformanceCaveat: false, // Ensure loading on low-end GPUs
+        maxBounds: [
+          [16.3449, -34.8191],
+          [32.8912, -22.1265]
+        ]
       });
 
-      // 5. Stylised label appearance
-      this.stylizeLabels();
+      this.map.on('style.load', () => {
+        this.visualEffects = new VisualEffects(this.map);
+        (this.map as any).visualEffects = this.visualEffects;
+        this.cameraController = new NavigationCameraController(this.map);
 
-      // 6. Smooth Zoom Tuning
-      this.map.scrollZoom.setWheelZoomRate(1/600); 
-      this.map.scrollZoom.setZoomRate(1/600);
+        // Add Mapbox scale control for tactical navigation scale
+        const scale = new mapboxgl.ScaleControl({
+          maxWidth: 80,
+          unit: 'metric'
+        });
+        this.map.addControl(scale, 'bottom-left');
 
-      this.styleLoaded = true;
-      this.resolveStyleLoaded();
-    });
+        // 3. Cinematic lighting preset
+        let lightPreset = 'dusk';
+        const hour = new Date().getHours();
+        if (hour >= 6 && hour < 17) {
+          lightPreset = 'day';
+        } else if (hour >= 17 && hour < 19) {
+          lightPreset = 'dusk';
+        } else if (hour >= 19 || hour < 5) {
+          lightPreset = 'night';
+        } else {
+          lightPreset = 'dawn';
+        }
+        this.map.setConfigProperty('basemap', 'lightPreset', lightPreset);
+        
+        // Disable 3D buildings and custom models on mobile to maximize performance and prevent WebView out-of-memory crashes
+        this.map.setConfigProperty('basemap', 'showLandmarks', !isMobile);
+        this.map.setConfigProperty('basemap', 'show3dObjects', !isMobile);
+        this.map.setConfigProperty('basemap', 'showTraffic', true); // Keep live traffic flow
 
-    this.map.on('load', () => {
-      // Cancel rotation on user interaction
-      this.map.on('mousedown', () => {
-        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
-      });
-      this.map.on('wheel', () => {
-        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
-      });
-      this.map.on('touchstart', () => {
-        if (this.cameraController) this.cameraController.setMode(CameraMode.FREE_EXPLORE);
+        // 4. Tactical road overlay (Optimized layer styling)
+        this.injectTacticalRoads();
+
+        // 5. Atmosphere / Fog (Skip on mobile to avoid costly fragment shaders)
+        if (!isMobile) {
+          this.map.setFog({
+            range: [0.5, 4],
+            color: '#050505',
+            'high-color': '#00f2ff',
+            'space-color': '#000000',
+            'horizon-blend': 0.05
+          });
+        }
+
+        // 6. Stylised label appearance (Optimized)
+        this.stylizeLabels();
+
+        // 7. Smooth Zoom Tuning
+        this.map.scrollZoom.setWheelZoomRate(1/600); 
+        this.map.scrollZoom.setZoomRate(1/600);
+
+        // Resolve internal ready promise
+        this.resolveStyleLoaded();
+        if (this.onStyleReadyCallback) this.onStyleReadyCallback();
       });
 
-      // 6. Interactive POIs
-      this.map.on('click', 'poi-label', (e) => {
-        if (!e.features || e.features.length === 0) return;
-        const feature = e.features[0];
-        const props = feature.properties as any;
-        const name = props.name || 'Target Objective';
-        const category = props.category_en || 'Urban Node';
-        this.emitPoiIntelligence(name, category, feature.geometry);
-      });
+      this.map.on('load', () => {
+        // 8. Interactive POIs & Landmarks (Safe Query)
+        this.map.on('click', (e) => {
+          try {
+            const features = this.map.queryRenderedFeatures(e.point);
+            if (!features || features.length === 0) return;
+            
+            const interactive = features.find(f => 
+              f.properties?.name || 
+              f.properties?.name_en ||
+              f.layer?.id.includes('label') ||
+              f.layer?.id.includes('poi')
+            );
+            
+            if (!interactive) return;
+            
+            const props = interactive.properties as any;
+            const name = props.name || props.name_en || 'Target Objective';
+            const category = props.category_en || props.type || 'Urban Node';
+            
+            this.emitPoiIntelligence(name, category, interactive.geometry);
+          } catch (err) {}
+        });
 
-      // Cursor hover effects
-      this.map.on('mouseenter', 'poi-label', () => {
-        this.map.getCanvas().style.cursor = 'pointer';
+        this.map.on('mousemove', (e) => {
+          try {
+            const features = this.map.queryRenderedFeatures(e.point);
+            const hasInteractive = features && features.some(f => 
+              f.layer?.id.includes('poi') || 
+              f.layer?.id.includes('label') || 
+              f.layer?.id.includes('place')
+            );
+            this.map.getCanvas().style.cursor = hasInteractive ? 'pointer' : '';
+          } catch (err) {}
+        });
       });
-      this.map.on('mouseleave', 'poi-label', () => {
-        this.map.getCanvas().style.cursor = '';
-      });
-    });
+    } catch (e) {
+      console.error('[MapRenderer] Initialization failed:', e);
+      // Fail gracefully so the app can hide loader and show error
+      setTimeout(() => {
+        this.resolveStyleLoaded();
+        if (this.onStyleReadyCallback) this.onStyleReadyCallback();
+      }, 500);
+    }
 
     // Global intelligence updates
     intelligence.on('intelligence-update', (update: any) => this.addTacticalMarker(update));
@@ -126,9 +193,9 @@ export class MapRenderer {
   /** --------------------------------------------------------------
    *  POI layer filter
    *  -------------------------------------------------------------- */
-  public setPoiFilter(category: string) {
+  public setPoiFilter(category: string | null) {
     if (this.visualEffects) {
-      this.visualEffects.setPoiFilter(category === 'all' ? null : category);
+      this.visualEffects.setPoiFilter(category);
     }
   }
 
@@ -137,19 +204,19 @@ export class MapRenderer {
    *  -------------------------------------------------------------- */
   private injectTacticalRoads() {
     const layers = this.map.getStyle().layers;
+    // Batch updates only to targeted layer classes
     layers.forEach(layer => {
       try {
-        if (layer.id.includes('road')) {
-          this.map.setPaintProperty(layer.id, 'line-color', '#050505');
-        }
-        if (layer.id.includes('water')) {
-          this.map.setPaintProperty(layer.id, 'fill-color', '#0000ff');
-        }
-        if (layer.id.includes('land') || layer.id.includes('park') || layer.id.includes('green')) {
+        const id = layer.id;
+        if (id.includes('road')) {
+          this.map.setPaintProperty(id, 'line-color', '#050505');
+        } else if (id.includes('water')) {
+          this.map.setPaintProperty(id, 'fill-color', '#0000ff');
+        } else if ((id.includes('land') || id.includes('park') || id.includes('green')) && id.includes('area')) {
           this.map.setPaintProperty(
-            layer.id,
+            id,
             'fill-color',
-            layer.id.includes('land') ? '#4b3621' : '#00ff00'
+            id.includes('land') ? '#4b3621' : '#00ff00'
           );
         }
       } catch (e) {}
@@ -190,17 +257,14 @@ export class MapRenderer {
     });
   }
 
-  /** --------------------------------------------------------------
-   *  Label appearance
-   *  -------------------------------------------------------------- */
   private stylizeLabels() {
     const layers = this.map.getStyle().layers;
+    // Only target layers containing 'label' in their ID to speed up styling execution
     layers.forEach(layer => {
-      if (layer.type === 'symbol') {
+      if (layer.type === 'symbol' && layer.id.includes('label')) {
         try {
-          this.map.setPaintProperty(layer.id, 'text-color', '#00f2ff');
-          this.map.setPaintProperty(layer.id, 'text-halo-color', '#000000');
-          this.map.setPaintProperty(layer.id, 'text-halo-width', 2);
+          this.map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(0,0,0,0.85)');
+          this.map.setPaintProperty(layer.id, 'text-halo-width', 1.5);
         } catch (e) {}
       }
     });
@@ -300,15 +364,21 @@ export class MapRenderer {
   /** --------------------------------------------------------------
    *  Navigation mode toggles
    *  -------------------------------------------------------------- */
-  public enterNavigationMode() {
-    this.isNavigationMode = true;
+  /** Register a UI callback that runs when the map style is fully loaded */
+  public onStyleReady(cb: () => void) {
+    this.onStyleReadyCallback = cb;
+  }
+
+  // Preserve backward compatibility for any older code using the old name
+  public onStyleLoaded(cb: () => void) { this.onStyleReady(cb); }
+
+public enterNavigationMode() {
     if (this.cameraController) {
-      this.cameraController.setMode(CameraMode.DRIVING);
+      this.cameraController.setMode(CameraMode.CINEMATIC);
     }
   }
 
   public exitNavigationMode() {
-    this.isNavigationMode = false;
     if (this.cameraController) {
       this.cameraController.setMode(CameraMode.OVERVIEW);
     }
@@ -327,13 +397,14 @@ export class MapRenderer {
     coords: [number, number],
     heading: number,
     speed: number,
+    force: boolean = false,
     _minZoom: number = 15.5,
     _maxZoom: number = 19
   ) {
-    if (!this.isNavigationMode) return;
-
     if (this.cameraController) {
-      this.cameraController.update(coords, heading, speed);
+      // Force follow mode if this is a mandatory update (e.g. start of nav)
+      if (force) this.cameraController.setMode(CameraMode.CINEMATIC);
+      this.cameraController.update(coords, heading, speed, force);
     }
   }
 

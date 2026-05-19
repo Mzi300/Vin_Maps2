@@ -67,7 +67,6 @@ export class VisualEffects {
       try {
         if (this.map.getLayer('neon-route-glow')) this.map.moveLayer('neon-route-glow');
         if (this.map.getLayer('neon-route-core')) this.map.moveLayer('neon-route-core');
-        if (this.map.getLayer('neon-route-arrows')) this.map.moveLayer('neon-route-arrows');
       } catch (e) {}
     } else {
       this.map.addSource('neon-route-source', {
@@ -75,30 +74,7 @@ export class VisualEffects {
         data: routeGeoJSON
       });
 
-      // Core bright line
-      this.map.addLayer({
-        id: 'neon-route-core',
-        type: 'line',
-        source: 'neon-route-source',
-        layout: {
-          'line-join': 'round',
-          'line-cap': 'round'
-        },
-        paint: {
-          'line-color': '#32CD32', // Ultra-bright Lime
-          'line-width': 14,        // Elegant high-res width
-          'line-opacity': 1.0,
-          'line-blur': 0
-        },
-        slot: 'top'
-      });
-      
-      try {
-        this.map.moveLayer('neon-route-core');
-      } catch (e) {}
-
-
-      // Outer glow layer (Tactical Neon Flare) - Wider to cover road
+      // 1. Outer glow layer (Tactical Neon Flare) - Dynamic zoom matching road width
       this.map.addLayer({
         id: 'neon-route-glow',
         type: 'line',
@@ -109,14 +85,58 @@ export class VisualEffects {
         },
         paint: {
           'line-color': '#32CD32', // Lime Glow
-          'line-width': 25,        // Elegant glow flare
-          'line-blur': 8,          // Tighter blur
-          'line-opacity': 0.4      // Balanced glow
+          'line-width': [
+            'interpolate',
+            ['exponential', 1.5],
+            ['zoom'],
+            10, 16,
+            13, 32,
+            15, 50,
+            17, 80,
+            20, 140
+          ],
+          'line-blur': 12,         // Bloom effect
+          'line-opacity': 0.45      // High visibility glow
         },
-        slot: 'top'
-      }, 'neon-route-core');
+        slot: 'middle' // Draws flat on the ground/road, below 3D buildings
+      });
 
-      // Directional Arrows and Symbols removed for cleaner solid line
+      // 2. Core bright line - Bold green line scaling to perfectly fill the road
+      this.map.addLayer({
+        id: 'neon-route-core',
+        type: 'line',
+        source: 'neon-route-source',
+        layout: {
+          'line-join': 'round',
+          'line-cap': 'round'
+        },
+        paint: {
+          'line-color': '#32CD32', // Ultra-bright Lime
+          'line-width': [
+            'interpolate',
+            ['exponential', 1.5],
+            ['zoom'],
+            10, 8,
+            13, 16,
+            15, 24,
+            17, 36,
+            20, 70
+          ],
+          'line-opacity': 1.0,
+          'line-blur': 0
+        },
+        slot: 'middle' // Draws flat on the ground/road, below 3D buildings
+      }, 'neon-route-glow');
+
+      try {
+        this.map.moveLayer('neon-route-glow');
+        this.map.moveLayer('neon-route-core');
+      } catch (e) {}
+    }
+
+    // Start arrow dash flow animation loop if not already running
+    if (this.animationId === null) {
+      this.animateArrows();
     }
 
     // Add Destination Marker (Neon Pulse)
@@ -261,13 +281,19 @@ export class VisualEffects {
   }
 
   public updateUserLocationGlow(coords: [number, number]) {
-    if (this.userLocationMarker) this.userLocationMarker.remove();
+    if (this.userLocationMarker) {
+      this.userLocationMarker.setLngLat(coords);
+      return;
+    }
 
     const el = document.createElement('div');
     el.className = 'user-location-glow';
     el.innerHTML = '<div class="glow-core"></div><div class="glow-pulse"></div>';
 
-    this.userLocationMarker = new mapboxgl.Marker(el)
+    this.userLocationMarker = new mapboxgl.Marker({
+      element: el,
+      anchor: 'center'
+    })
       .setLngLat(coords)
       .addTo(this.map);
   }
@@ -280,6 +306,11 @@ export class VisualEffects {
     if (this.map.getSource('neon-route-source')) this.map.removeSource('neon-route-source');
     if (this.destMarker) this.destMarker.remove();
     this.destMarker = null;
+
+    if (this.animationId !== null) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
   }
 
   public togglePOILayers(active: boolean) {
@@ -292,27 +323,54 @@ export class VisualEffects {
   }
 
   public setPoiFilter(category: string | null) {
-    // Category mapping for Mapbox Standard layers
-    const layerMapping: Record<string, string[]> = {
-      hospital: ['medical-label', 'hospital-label'],
-      police: ['police-label', 'security-label'],
-      bank: ['bank-label', 'atm-label', 'financial-label'],
-      fuel: ['gas-label', 'fuel-station-label'],
-      hotel: ['hotel-label', 'lodging-label']
+    // 1. Clear any custom markers if switching categories
+    // (Custom markers could be added here if we wanted to supplement Mapbox data)
+
+    // 2. Define category keywords for Mapbox Standard layers and properties
+    const categoryKeywords: Record<string, string[]> = {
+      hospital: ['hospital', 'clinic', 'medical', 'health'],
+      police: ['police', 'saps', 'security', 'government', 'justice'],
+      bank: ['bank', 'atm', 'finance', 'money'],
+      fuel: ['fuel', 'gas', 'petrol', 'garage'],
+      rank: ['bus', 'transit', 'taxi', 'station', 'stop'],
+      shisanyama: ['restaurant', 'food', 'fast_food', 'bar', 'shisanyama'],
+      spaza: ['convenience', 'shop', 'grocery', 'market', 'mall', 'store'],
+      hotel: ['hotel', 'motel', 'lodging', 'resort', 'guest_house'],
+      school: ['school', 'university', 'college', 'education', 'varsity', 'academy']
     };
 
-    const targetLayers = category ? layerMapping[category] || [] : [];
+    const keywords = category && category !== 'all' ? categoryKeywords[category] || [category] : [];
     
-    // Highlight relevant labels using tactical neon styles
-    this.map.getStyle().layers.forEach(layer => {
+    // 3. Update visibility and style of existing map labels
+    const layers = this.map.getStyle().layers;
+    layers.forEach(layer => {
       if (layer.type === 'symbol') {
-        const isMatch = targetLayers.some(tl => layer.id.includes(tl));
+        const layerId = layer.id.toLowerCase();
+        // Check if the layer ID itself suggests a match (for some styles)
+        const isLayerMatch = keywords.some(kw => layerId.includes(kw));
         
         try {
-          this.map.setPaintProperty(layer.id, 'text-color', isMatch ? '#00f2ff' : '#ffffff');
-          this.map.setPaintProperty(layer.id, 'text-halo-color', isMatch ? 'rgba(0, 242, 255, 0.4)' : 'rgba(0,0,0,0.8)');
-          this.map.setPaintProperty(layer.id, 'text-halo-width', isMatch ? 4 : 1);
-        } catch (e) {}
+          // For Mapbox Standard, we can't easily set filters on individual features inside the basemap 
+          // via setFilter on the 'basemap' layer. Instead, we use setPaintProperty to highlight them 
+          // if they match our tactical criteria.
+          
+          const highlightColor = '#00f2ff'; // Tactical Cyan
+          
+          // We apply a conditional paint property if the style supports it, 
+          // or we just highlight specific layers.
+          if (isLayerMatch || category === 'all') {
+            this.map.setPaintProperty(layer.id, 'text-color', highlightColor);
+            this.map.setPaintProperty(layer.id, 'text-halo-color', 'rgba(0, 242, 255, 0.4)');
+            this.map.setPaintProperty(layer.id, 'text-halo-width', 3);
+          } else {
+            // Reset to default basemap presets to keep all roadside names legible and visible
+            this.map.setPaintProperty(layer.id, 'text-color', undefined);
+            this.map.setPaintProperty(layer.id, 'text-halo-color', undefined);
+            this.map.setPaintProperty(layer.id, 'text-halo-width', undefined);
+          }
+        } catch (e) {
+          // Ignore errors for layers that don't support these properties
+        }
       }
     });
   }

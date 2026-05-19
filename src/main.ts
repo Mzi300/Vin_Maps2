@@ -2,7 +2,6 @@ import { MapRenderer } from './view/mapRenderer';
 import { intelligence } from './engine/intelligenceManager';
 import { TRANSPORT_PROFILES } from './data/transportModes';
 import type { TransportType } from './data/transportModes';
-import { GeolocationService } from './engine/geolocationService';
 import { RouteOptimizer } from './engine/routeOptimizer';
 import type { OptimizedRoute } from './engine/routeOptimizer';
 import { NavigationSystem } from './engine/navigationSystem';
@@ -10,6 +9,8 @@ import { LocationCache } from './engine/persistence';
 import { realtime } from './engine/realtimeService';
 import { systemMonitor } from './engine/systemMonitor';
 import { SensorIntelligence } from './engine/sensorIntelligence';
+import { universalSearch } from './engine/universalSearch';
+import type { SearchResult } from './engine/universalSearch';
 import './style/index.css';
 
 window.addEventListener('error', (e) => {
@@ -36,11 +37,86 @@ class App {
   private geocodingAbortController: AbortController | null = null;
   private routingAbortController: AbortController | null = null;
   private isPanicMode: boolean = true;
+  private hasSpokenWelcome: boolean = false;
 
   constructor() {
     this.renderUIShell();
+    this.initViewportHeight();
+    this.initResizeObserver();
+    this.unlockVoiceSynthesis();
     // Defer heavy systems to achieve <1s UI visibility
     setTimeout(() => this.initHeavySystems(), 10);
+  }
+
+  private unlockVoiceSynthesis() {
+    const unlock = () => {
+      if ('speechSynthesis' in window) {
+        const u = new SpeechSynthesisUtterance('');
+        window.speechSynthesis.speak(u);
+        console.log('[App] Voice synthesis unlocked successfully via gesture');
+        this.speakWelcomeGreeting();
+      }
+      document.removeEventListener('click', unlock);
+      document.removeEventListener('touchstart', unlock);
+    };
+    document.addEventListener('click', unlock);
+    document.addEventListener('touchstart', unlock);
+  }
+
+  private speakWelcomeGreeting() {
+    if (this.hasSpokenWelcome) return;
+    this.hasSpokenWelcome = true;
+    console.log('[App] Speaking welcome greeting...');
+    this.speakBriefing("Welcome to VinMaps. System initialized. Tactical link established.");
+  }
+
+  private initViewportHeight() {
+    const updateVh = () => {
+      const vh = window.innerHeight * 0.01;
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+    updateVh();
+    window.addEventListener('resize', this.debounce(() => {
+      updateVh();
+    }, 150));
+  }
+
+  private initResizeObserver() {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    const resizeObserver = new ResizeObserver(this.debounce((entries: ResizeObserverEntry[]) => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        this.handleResize(width, height);
+      }
+    }, 100));
+    resizeObserver.observe(appEl);
+  }
+
+  private handleResize(width: number, height: number) {
+    const appEl = document.getElementById('app');
+    if (!appEl) return;
+    
+    // Reset classes
+    appEl.classList.remove('compact-320', 'compact-360', 'compact-480', 'tablet-768', 'desktop-1024', 'mobile-landscape');
+    
+    // Apply classes based on width breakpoints
+    if (width < 360) {
+      appEl.classList.add('compact-320');
+    } else if (width < 480) {
+      appEl.classList.add('compact-360');
+    } else if (width < 768) {
+      appEl.classList.add('compact-480');
+    } else if (width < 1024) {
+      appEl.classList.add('tablet-768');
+    } else {
+      appEl.classList.add('desktop-1024');
+    }
+
+    // Apply landscape class if aspect ratio is wide but height is small (mobile landscape)
+    if (width > height && height < 500) {
+      appEl.classList.add('mobile-landscape');
+    }
   }
 
   private renderUIShell() {
@@ -55,7 +131,7 @@ class App {
         
         <div id="sidebar" class="glass-panel sidebar-panel">
           <div class="sidebar-header">
-            <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
+            <h2 style="color:var(--primary-accent); font-size:1.2rem;">VINMAPS COMMAND</h2>
             <button id="close-sidebar" class="close-btn">×</button>
           </div>
           <div class="sidebar-content">
@@ -120,7 +196,10 @@ class App {
                     ${Object.values(TRANSPORT_PROFILES).map(p => `
                       <button class="transport-tab" data-type="${p.type}" title="${p.type.toUpperCase()}">
                         <span class="tab-icon">${p.icon}</span>
-                        <span class="tab-time">--m</span>
+                        <div style="display:flex; flex-direction:column; align-items:center;">
+                          <span class="tab-time">--m</span>
+                          <span class="tab-dist" style="font-size:0.6rem; opacity:0.8;">--km</span>
+                        </div>
                       </button>
                     `).join('')}
                   </div>
@@ -150,22 +229,41 @@ class App {
                 </button>
                 <div id="poi-dropdown-menu" class="glass-panel dropdown-menu">
                   <div class="dropdown-section">
-                    <label>VIMAPS INTEL</label>
-                    <button class="cat-btn" data-poi="hospital">🏥 Hospitals</button>
-                    <button class="cat-btn" data-poi="police">🛡️ Security</button>
-                    <button class="cat-btn" data-poi="bank">🏦 Financial</button>
-                    <button class="cat-btn" data-poi="fuel">⛽ Fuel</button>
-                    <button class="cat-btn" data-poi="hotel">🏨 Lodging</button>
+                    <label>EMERGENCY & SECURITY</label>
+                    <button class="cat-btn" data-poi="hospital">🏥 Hospitals / Clinics</button>
+                    <button class="cat-btn" data-poi="police">🛡️ SAPS / Security</button>
                   </div>
+                  <div class="dropdown-divider"></div>
+                  <div class="dropdown-section">
+                    <label>ESSENTIAL SERVICES</label>
+                    <button class="cat-btn" data-poi="bank">🏦 Banks / ATMs</button>
+                    <button class="cat-btn" data-poi="fuel">⛽ Garages / Petrol</button>
+                    <button class="cat-btn" data-poi="rank">🚐 Taxi Ranks</button>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <div class="dropdown-section">
+                    <label>COMMUNITY & FOOD</label>
+                    <button class="cat-btn" data-poi="shisanyama">🍖 Shisanyama / Food</button>
+                    <button class="cat-btn" data-poi="spaza">🏪 Spaza Shops</button>
+                    <button class="cat-btn" data-poi="hotel">🏨 Lodging / Hotels</button>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <div class="dropdown-section">
+                    <label>EDUCATION</label>
+                    <button class="cat-btn" data-poi="school">🎓 Schools & Education</button>
+                  </div>
+                  <div class="dropdown-divider"></div>
+                  <button class="cat-btn" data-poi="all">🌐 View All Intel</button>
                 </div>
               </div>
 
               <div id="nav-bottom-bar" class="nav-bar-minimal glass-panel" style="display: none;">
                 <div class="nav-info-group">
-                  <span id="nav-eta-time" class="nav-main-eta">CALCULATING...</span>
+                  <span id="nav-eta-main" class="nav-main-eta">CALCULATING...</span>
                   <div class="nav-info">
                     <span id="nav-eta-time">-- min</span>
                     <span id="nav-dist-left">-- km</span>
+                    <span id="nav-arrival" style="margin-left: 10px; opacity: 0.7;">--:--</span>
                     <div id="safety-badge" class="safety-badge">
                       🛡️ TSI: --
                     </div>
@@ -178,15 +276,30 @@ class App {
 
           <!-- Floating Controls -->
           <div class="floating-controls">
-            <button id="recenter-btn" class="gta-hud-circle recenter-btn" style="display: none;" title="Re-center">🎯</button>
-            <button id="weather-toggle" class="gta-hud-circle weather-toggle-btn" title="Toggle Weather">⛅</button>
-          </div>
+            <!-- Compass Button (Rotates to show bearing, click resets North) -->
+            <button id="compass-btn" class="gta-hud-circle compass-btn" title="Reset North">
+              <span id="compass-arrow" style="display: inline-block; font-size: 1.4rem; transition: transform 0.1s ease;">🧭</span>
+            </button>
 
-          <!-- Hazard Reporting FAB -->
-          <div id="hazard-fab" class="hazard-fab" style="display: none;">
-            <button class="hazard-btn pothole" onclick="app.reportHazard('pothole')">🕳️</button>
-            <button class="hazard-btn accident" onclick="app.reportHazard('accident')">💥</button>
-            <button class="hazard-btn roadblock" onclick="app.reportHazard('roadblock')">🚧</button>
+            <!-- Perspective Button (2D / 3D Toggle) -->
+            <button id="perspective-btn" class="gta-hud-circle perspective-btn" title="Toggle 2D/3D" style="font-family: 'JetBrains Mono', monospace; font-size: 0.8rem; font-weight: bold; letter-spacing: 0.5px;">3D</button>
+
+            <!-- Unified Zoom Pill Control -->
+            <div class="zoom-controls-group">
+              <button id="zoom-in-btn" class="zoom-pill-btn" title="Zoom In">+</button>
+              <div style="height: 1px; background: rgba(255, 255, 255, 0.15); width: 60%; margin: 0 auto;"></div>
+              <button id="zoom-out-btn" class="zoom-pill-btn" title="Zoom Out">−</button>
+            </div>
+
+            <button id="recenter-btn" class="gta-hud-circle recenter-btn" title="Re-center">🎯</button>
+            <button id="theme-toggle" class="gta-hud-circle theme-toggle-btn" title="Toggle Theme">🌙</button>
+            
+            <!-- Hazard Reporting FAB (Nested in the same column) -->
+            <div id="hazard-fab" class="hazard-fab" style="display: none;">
+              <button class="hazard-btn pothole" onclick="app.reportHazard('pothole')">🕳️</button>
+              <button class="hazard-btn accident" onclick="app.reportHazard('accident')">💥</button>
+              <button class="hazard-btn roadblock" onclick="app.reportHazard('roadblock')">🚧</button>
+            </div>
           </div>
 
           <!-- SOS / Panic Button -->
@@ -212,7 +325,7 @@ class App {
         <div id="startup-loader" class="startup-loader">
           <div class="loader-content">
             <div class="loader-spinner"></div>
-            <h1 class="loader-title">VIMAPS SYSTEM</h1>
+            <h1 class="loader-title">VINMAPS SYSTEM</h1>
             <p class="loader-status" id="loader-status">Initializing tactical link...</p>
           </div>
         </div>
@@ -223,87 +336,189 @@ class App {
     // to avoid double-binding or binding to uninitialized objects.
   }
 
+  private async acquireStartingCoordinates(): Promise<[number, number]> {
+    const cached = LocationCache.get();
+    
+    // 1. Try GPS immediately with a tight timeout to keep launch snappy
+    const getGpsPromise = new Promise<[number, number]>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("No geolocation support"));
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          resolve([position.coords.longitude, position.coords.latitude]);
+        },
+        (err) => reject(err),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+      );
+    });
+
+    // 2. Try fast IP-based location as secondary high-legibility fallback
+    const getIpPromise = async (): Promise<[number, number]> => {
+      const res = await fetch('https://ipapi.co/json/');
+      const data = await res.json();
+      if (data && typeof data.longitude === 'number' && typeof data.latitude === 'number') {
+        return [data.longitude, data.latitude];
+      }
+      throw new Error("Invalid IP location data");
+    };
+
+    try {
+      console.log("[App] Querying start coordinates via GPS...");
+      const gpsCoords = await getGpsPromise;
+      console.log("[App] Startup GPS lock secured successfully:", gpsCoords);
+      LocationCache.save(gpsCoords);
+      return gpsCoords;
+    } catch (gpsErr) {
+      console.warn("[App] Geolocation query failed or timed out:", gpsErr);
+      
+      try {
+        console.log("[App] Querying start coordinates via low-latency IP Geolocation...");
+        const ipCoords = await getIpPromise();
+        console.log("[App] Startup IP lock secured successfully:", ipCoords);
+        LocationCache.save(ipCoords);
+        return ipCoords;
+      } catch (ipErr) {
+        console.warn("[App] IP Geolocation query failed:", ipErr);
+        // 3. Last resort - Cache or Johannesburg
+        return cached?.coords || [28.0473, -26.2041];
+      }
+    }
+  }
+
   private async initHeavySystems() {
-    console.log('[App] GPS_REQUEST_START');
     if (!this.token) {
       console.error('Critical: Mapbox Token missing.');
       return;
     }
 
-    const loaderStatus = document.getElementById('loader-status');
-    const loader = document.getElementById('startup-loader');
-    
-    // 1. GPS LOCK WINDOW (5-8 Seconds)
-    const geoService = new GeolocationService(null);
+    // 1. Get cached or default coordinates immediately for instant startup
     const cached = LocationCache.get();
-    
-    let initialCoords: [number, number];
-    try {
-      // Race between GPS and an 8s timeout (Requirement: 5-8s)
-      initialCoords = await Promise.race([
-        geoService.getCurrentLocation(),
-        new Promise<[number, number]>((_, reject) => setTimeout(() => reject('TIMEOUT'), 8000))
-      ]);
-      console.log(`[App] GPS_SUCCESS: ${initialCoords[0]}, ${initialCoords[1]}`);
-    } catch (e) {
-      console.warn('[App] GPS_ACQUISITION_TIMEOUT - Using Tactical Cache Fallback');
-      initialCoords = cached?.coords || [28.0473, -26.2041];
-    }
+    const fallbackCoords: [number, number] = cached?.coords || [28.0473, -26.2041];
+    this.currentOriginCoords = fallbackCoords;
 
-    this.currentOriginCoords = initialCoords;
-    console.log(`[App] MAP_CENTER_SET: ${initialCoords[0]}, ${initialCoords[1]}`);
-
-    // 2. Initialize Map at the resolved coordinates
-    this.map = new MapRenderer('map-container', this.token!, initialCoords);
-    (window as any).app = this;
-    (window as any).appMap = this.map;
-    
+    // Initialize systems first so references exist even if map fails
     this.routeOptimizer = new RouteOptimizer(this.token!);
     this.navSystem = new NavigationSystem();
 
-    // Background systems
-    if ('requestIdleCallback' in window) {
-      window.requestIdleCallback(() => {
-        this.routeOptimizer.prewarmRouting();
-        new SensorIntelligence(this.navSystem).start();
+    try {
+      // 2. Initialize Map immediately centered on cached or fallback coordinates
+      this.map = new MapRenderer('map-container', this.token!, fallbackCoords);
+      (window as any).app = this;
+      (window as any).appMap = this.map;
+
+      // Reveal UI and map canvas immediately (500ms fade-out) for instant load feeling
+      setTimeout(() => {
+        this.hideStartupLoader();
+        if (this.map && this.map.map) {
+          const mapCanvas = this.map.map.getCanvas();
+          if (mapCanvas) mapCanvas.style.opacity = '1';
+        }
+      }, 500);
+      
+      this.map.onStyleReady(() => { 
+        document.body.classList.add('ready');
+        this.requestCompassPermission();
+        
+        if (this.currentOriginCoords) {
+          console.log(`[App] Style ready. Centering on active coordinates: ${this.currentOriginCoords}`);
+          this.map.updateCameraForNav(this.currentOriginCoords, 0, 0, true);
+          this.navSystem.snapToPosition(this.currentOriginCoords, 0);
+        }
+
+        // Immediately reveal UI and initialize map systems on style ready
+        this.handleMapLoaded(fallbackCoords);
       });
+      
+      // 3. ASYNCHRONOUS LOCATION RESOLUTION: Query GPS/IP in the background
+      this.acquireStartingCoordinates()
+        .then(freshCoords => {
+          if (freshCoords) {
+            console.log(`[App] Startup coordinates resolved: ${freshCoords[0]}, ${freshCoords[1]}`);
+            this.currentOriginCoords = freshCoords;
+            if (this.map) {
+              if (this.map.map) {
+                this.map.map.jumpTo({ center: freshCoords });
+              }
+              this.map.updateCameraForNav(freshCoords, 0, 0, true);
+              this.navSystem.snapToPosition(freshCoords, 0);
+            }
+          }
+        })
+        .catch(() => console.warn('[App] Startup coordinates query failed - Staying with cached/default position'));
+
+      // Background systems
+      if ('requestIdleCallback' in window) {
+        window.requestIdleCallback(() => {
+          this.routeOptimizer.prewarmRouting();
+          try {
+            new SensorIntelligence(this.navSystem).start();
+          } catch (e) {
+            console.error('[App] Failed to start sensor intelligence:', e);
+          }
+        });
+      }
+
+      if (!this.map || !this.map.map) {
+        // Fallback if MapRenderer loaded without map object (e.g. WebGL not supported)
+        this.hideStartupLoader();
+        this.showWebGLFallbackMessage();
+      }
+    } catch (e) {
+      console.error('[App] Exception during MapRenderer instantiation:', e);
+      this.hideStartupLoader();
+      this.showWebGLFallbackMessage();
     }
 
-    this.map.map.on('load', () => {
-      console.log('[App] MAP_READY');
-      
-      // 3. VEHICLE_MARKER_SET & AUTO-FOLLOW
-      this.navSystem.snapToPosition(initialCoords, 0);
-      this.navSystem.startTracking();
+    this.setupListeners();
+  }
+
+  private hideStartupLoader() {
+    const startupLoader = document.getElementById('startup-loader');
+    if (startupLoader) {
+      startupLoader.classList.add('hidden');
+      setTimeout(() => startupLoader.remove(), 800);
+    }
+  }
+
+  private handleMapLoaded(initialCoords: [number, number]) {
+    console.log('[App] MAP_READY');
+    
+    // 3. VEHICLE_MARKER_SET & AUTO-FOLLOW
+    this.setupNavigationStateListener();
+    this.navSystem.snapToPosition(this.currentOriginCoords || initialCoords, 0);
+    this.navSystem.startTracking();
+    if (this.map) {
       this.map.enterNavigationMode(); // This enables camera follow mode
-      this.setupNavigationStateListener();
+    }
 
-      if (this.map.visualEffects) {
-        this.map.visualEffects.updateUserVehicle(initialCoords, 0);
-        console.log('[App] VEHICLE_MARKER_SET');
-      }
-
-      // REVEAL UI
-      console.log('[App] READY_STATE_ENTERED');
+    // REVEAL UI
+    console.log('[App] READY_STATE_ENTERED');
+    if (this.map && this.map.map) {
       const mapCanvas = this.map.map.getCanvas();
       if (mapCanvas) mapCanvas.style.opacity = '1';
-      
-      if (loader) {
-        loader.classList.add('hidden');
-        setTimeout(() => loader.remove(), 800);
-      }
-      
-      this.initSystemMonitor();
-      import('./engine/smartCityService').then(({ smartCity }) => {
+    }
+    
+    this.hideStartupLoader();
+    
+    this.initSystemMonitor();
+    import('./engine/smartCityService').then(({ smartCity }) => {
+      if (this.map) {
         smartCity.onSignalUpdate((signals) => this.map.updateTrafficSignals(signals));
-      });
-
-      // Update origin input
-      const originInput = document.getElementById('origin-input') as HTMLInputElement;
-      if (originInput) originInput.value = 'Current Location';
+      }
     });
 
-    this.setupListeners();
+    // Update origin input
+    const originInput = document.getElementById('origin-input') as HTMLInputElement;
+    if (originInput) originInput.value = 'Current Location';
+
+    // Speak welcome greeting if voice is already unlocked/WebView pre-granted
+    this.speakWelcomeGreeting();
+  }
+
+  private showWebGLFallbackMessage() {
+    this.showTacticalNotification("TACTICAL WARNING: WebGL acceleration is disabled or unsupported. Please check device settings.");
   }
 
   private debounce(func: Function, wait: number) {
@@ -347,18 +562,49 @@ class App {
 
     document.querySelectorAll('.sidebar-item').forEach(item => {
       item.addEventListener('click', (e) => {
-        const text = (e.currentTarget as HTMLElement).innerText;
+        const target = e.currentTarget as HTMLElement;
+        const text = target.innerText;
+        
+        // Stealth mode has its own listener, ignore it here
+        if (target.id === 'toggle-stealth') return;
+
         sidebar?.classList.remove('open');
         
         if (text.includes('Saved Sectors')) {
+          const sectors = LocationCache.getSectors();
+          const sector = sectors[Math.floor(Math.random() * sectors.length)];
           if (this.map) {
-            this.map.flyTo(28.0473, -26.2041, 15);
-            this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
-          } else {
-            this.showTacticalNotification('SYSTEM INITIALIZING: PLEASE WAIT');
+            this.map.flyTo(sector.coords[0], sector.coords[1], sector.zoom);
+            this.showTacticalNotification(`TRANSITIONING TO ${sector.name.toUpperCase()}`);
           }
-        } else if (text.includes('Recent Missions')) {
-          this.showTacticalNotification('LOADING MISSION ARCHIVES...');
+        } 
+        else if (text.includes('Recent Missions')) {
+          const missions = LocationCache.getMissions();
+          if (missions.length === 0) {
+            this.showTacticalNotification('NO RECENT MISSIONS LOGGED');
+          } else {
+            this.showTacticalNotification(`LAST MISSION: ${missions[0].destinationName.toUpperCase()}`);
+          }
+        }
+        else if (text.includes('Contributions')) {
+          const hazardFab = document.getElementById('hazard-fab');
+          if (hazardFab) {
+            hazardFab.style.display = 'flex';
+            this.showTacticalNotification('CONTRIBUTION UPLINK ACTIVE - SELECT HAZARD TYPE');
+          }
+        }
+        else if (text.includes('Timeline')) {
+          const duration = Math.floor((Date.now() - this.tripStartTime) / 60000);
+          this.showTacticalNotification(`SESSION TIMELINE: ${duration} MINS ACTIVE | SECTORS SCANNED: 4`);
+        }
+        else if (text.includes('Data in Maps')) {
+          this.showTacticalNotification('ENCRYPTED DATA LINK: ALL COORDINATES ARE STORED LOCALLY');
+        }
+        else if (text.includes('Share or Embed')) {
+          const center = this.map.map.getCenter();
+          const link = `${window.location.origin}/#loc=${center.lng.toFixed(5)},${center.lat.toFixed(5)}`;
+          navigator.clipboard.writeText(link);
+          this.showTacticalNotification('TACTICAL COORDINATE LINK COPIED TO CLIPBOARD');
         }
       });
     });
@@ -417,9 +663,90 @@ class App {
       if (this.map) this.map.recenter();
     });
 
-    // Weather
-    document.getElementById('weather-toggle')?.addEventListener('click', () => {
-      if (this.map.visualEffects) this.map.visualEffects.toggleWeather();
+
+
+    // Theme Toggle (Light/Dark Mode)
+    let currentThemePreset: 'day' | 'night' = 'night';
+    document.getElementById('theme-toggle')?.addEventListener('click', () => {
+      if (this.map && this.map.map) {
+        currentThemePreset = currentThemePreset === 'night' ? 'day' : 'night';
+        this.map.map.setConfigProperty('basemap', 'lightPreset', currentThemePreset);
+        
+        const btn = document.getElementById('theme-toggle');
+        if (btn) {
+          btn.innerHTML = currentThemePreset === 'night' ? '🌙' : '☀️';
+        }
+        
+        this.showTacticalNotification(
+          currentThemePreset === 'night' ? 'TACTICAL NIGHT THEME ACTIVE' : 'STEALTH DAYLIGHT THEME ACTIVE'
+        );
+      }
+    });
+
+    // Compass Reset
+    document.getElementById('compass-btn')?.addEventListener('click', () => {
+      if (this.map && this.map.map) {
+        this.map.map.easeTo({ bearing: 0, duration: 800 });
+        this.showTacticalNotification('NORTH-UP ALIGNMENT RESTORED');
+      }
+    });
+
+    // 2D/3D Toggle
+    document.getElementById('perspective-btn')?.addEventListener('click', () => {
+      if (this.map && this.map.map) {
+        const currentPitch = this.map.map.getPitch();
+        const newPitch = currentPitch > 10 ? 0 : 68;
+        this.map.map.easeTo({ pitch: newPitch, duration: 800 });
+        
+        const btn = document.getElementById('perspective-btn');
+        if (btn) {
+          btn.innerText = newPitch > 10 ? '2D' : '3D';
+        }
+        
+        this.showTacticalNotification(newPitch > 10 ? '3D PERSPECTIVE ENGAGED' : '2D FLAT MAP VIEW ACTIVE');
+      }
+    });
+
+    // Zoom In
+    document.getElementById('zoom-in-btn')?.addEventListener('click', () => {
+      if (this.map && this.map.map) {
+        this.map.map.zoomTo(this.map.map.getZoom() + 1, { duration: 300 });
+      }
+    });
+
+    // Zoom Out
+    document.getElementById('zoom-out-btn')?.addEventListener('click', () => {
+      if (this.map && this.map.map) {
+        this.map.map.zoomTo(this.map.map.getZoom() - 1, { duration: 300 });
+      }
+    });
+
+    // Sync Compass UI with Map Rotation
+    this.map.map.on('rotate', () => {
+      const bearing = this.map.map.getBearing();
+      const arrow = document.getElementById('compass-arrow');
+      if (arrow) {
+        arrow.style.transform = `rotate(${-bearing}deg)`;
+      }
+    });
+    
+    // Camera State Listeners
+    window.addEventListener('nav-camera-unlocked', () => {
+      const btn = document.getElementById('recenter-btn');
+      if (btn) {
+        btn.style.display = 'flex';
+        btn.classList.add('pulse-alert');
+      }
+      this.showTacticalNotification('CAMERA UNLOCKED - MANUAL OVERRIDE');
+    });
+
+    window.addEventListener('nav-camera-locked', () => {
+      const btn = document.getElementById('recenter-btn');
+      if (btn) {
+        btn.classList.remove('pulse-alert');
+        // We keep the button visible during navigation but remove the alert pulse
+      }
+      this.showTacticalNotification('CAMERA LOCKED - TRACKING OPERATOR');
     });
 
     // POI Dropdown
@@ -453,6 +780,13 @@ class App {
         dropdownToggle?.classList.remove('active');
       });
     });
+
+    // POI Click-to-Navigate Listener
+    window.addEventListener('poi-intelligence', (e: any) => {
+      const { name, location } = e.detail;
+      this.showTacticalNotification(`ACQUIRING INTEL: ${name.toUpperCase()}`);
+      this.handleGeocodingSelection(name, location, 'destination');
+    });
   }
 
   private async handleGeocoding(query: string, mode: 'origin' | 'destination') {
@@ -461,26 +795,108 @@ class App {
     if (this.geocodingAbortController) this.geocodingAbortController.abort();
     this.geocodingAbortController = new AbortController();
 
+    const userCoords = this.currentOriginCoords || [28.0473, -26.2041];
+
     try {
-      const proximity = this.currentOriginCoords ? `&proximity=${this.currentOriginCoords[0]},${this.currentOriginCoords[1]}` : '';
-      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${this.token}${proximity}&limit=5&country=ZA`;
+      // 1. Query local Destination Intelligence POI database & AI Intent Mapper
+      const localResults = universalSearch.search(query, userCoords);
+      
+      // 2. Query Mapbox Geocoding as a high-fidelity geographic fallback
+      const intel = intelligence.processQuery(query);
+      const searchQuery = intel.translatedQuery;
+      
+      const proximityParam = `&proximity=${userCoords[0]},${userCoords[1]}`;
+      
+      const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchQuery)}.json?access_token=${this.token}${proximityParam}&autocomplete=true&fuzzyMatch=true&limit=10&country=ZA&language=en`;
       
       const res = await fetch(url, { signal: this.geocodingAbortController.signal });
       const data = await res.json();
-      this.displaySuggestions(data.features, mode);
+      
+      // Enrich Mapbox raw locations with our Destination Intelligence schema
+      const mapboxResults = (data.features || []).map((f: any) => 
+        universalSearch.enrichMapboxFeature(f, userCoords)
+      );
+
+      // 3. Merge results, de-duplicate by name, and sort
+      const mergedResults: SearchResult[] = [];
+      const seenNames = new Set<string>();
+
+      // Load highly relevant local POIs first
+      for (const item of localResults) {
+        const key = item.name.toLowerCase();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          mergedResults.push(item);
+        }
+      }
+
+      // Load Mapbox fallback coordinates next
+      for (const item of mapboxResults) {
+        const key = item.name.toLowerCase();
+        if (!seenNames.has(key)) {
+          seenNames.add(key);
+          mergedResults.push(item);
+        }
+      }
+
+      // 4. Sort results. Prioritize safety critical results (hospitals, police, fuel) during urgent intents
+      const isUrgent = /help|sick|injured|emergency|police|robbed|fuel|empty|breakdown/i.test(query.toLowerCase());
+      mergedResults.sort((a, b) => {
+        if (isUrgent) {
+          const aEmergency = a.category === 'Health' || a.subCategory === 'Police Station';
+          const bEmergency = b.category === 'Health' || b.subCategory === 'Police Station';
+          if (aEmergency && !bEmergency) return -1;
+          if (!aEmergency && bEmergency) return 1;
+        }
+        return a.distance - b.distance;
+      });
+
+      this.displaySuggestions(mergedResults, mode);
     } catch (e) {
       if ((e as Error).name !== 'AbortError') console.error('Geocoding fail:', e);
     }
   }
 
-  private displaySuggestions(features: any[], mode: 'origin' | 'destination') {
+  private displaySuggestions(features: SearchResult[] | undefined, mode: 'origin' | 'destination') {
+    if (!features) return;
     const list = mode === 'destination' ? document.getElementById('suggestions-list') : document.getElementById('origin-suggestions');
     if (!list) return;
 
-    list.innerHTML = features.map(f => `
-      <div class="suggestion-item" data-lng="${f.center[0]}" data-lat="${f.center[1]}" data-text="${f.text}">
-        <div class="sugg-main">${f.text}</div>
-        <div class="sugg-sub">${f.place_name}</div>
+    list.innerHTML = features.map((f: SearchResult) => `
+      <div class="suggestion-item destination-card" 
+           data-lng="${f.coordinates[0]}" 
+           data-lat="${f.coordinates[1]}" 
+           data-text="${f.name}">
+        <div class="destination-card-header">
+          <div class="destination-icon-wrap">${f.icon}</div>
+          <div class="destination-title-wrap">
+            <span class="destination-name">${f.name}</span>
+            <span class="destination-category">${f.subCategory}</span>
+          </div>
+          <span class="destination-status-badge ${f.status.toLowerCase().replace(/[^a-z0-9]/g, '-')}">${f.status}</span>
+        </div>
+        <div class="destination-card-body">
+          <div class="destination-meta-item">
+            <span class="meta-label">DISTANCE</span>
+            <span class="meta-value">${f.distance} km</span>
+          </div>
+          <div class="destination-meta-item">
+            <span class="meta-label">ETA</span>
+            <span class="meta-value">~${f.travelTime} min</span>
+          </div>
+          <div class="destination-meta-item">
+            <span class="meta-label">SAFETY</span>
+            <span class="meta-value safety-score-${f.safetyScore > 80 ? 'high' : (f.safetyScore < 60 ? 'low' : 'medium')}">🛡️ TSI: ${f.safetyScore}</span>
+          </div>
+        </div>
+        <div class="destination-card-footer">
+          <div class="route-badges">
+            <span class="route-badge" title="Driving">🚗</span>
+            <span class="route-badge" title="Walking">🚶</span>
+            <span class="route-badge" title="Transit">🚇</span>
+          </div>
+          <button class="navigate-now-btn">NAVIGATE NOW</button>
+        </div>
       </div>
     `).join('');
     
@@ -524,8 +940,9 @@ class App {
     document.getElementById('search-view')!.style.display = 'none';
     document.getElementById('directions-view')!.style.display = 'flex';
     
-    const firstTab = document.querySelector('.transport-tab') as HTMLElement;
-    if (firstTab) firstTab.click();
+    // No longer auto-clicking the first tab. 
+    // The operator must now intentionally select a transport mode to generate the route.
+    this.showTacticalNotification('SELECT TRANSPORT MODE TO GENERATE ROUTE');
   }
 
   private async finalizeRouting(type: TransportType) {
@@ -536,6 +953,17 @@ class App {
 
     const profile = TRANSPORT_PROFILES[type].mapboxProfile;
     
+    // Show active skeleton loading state during route calculations
+    const navBottomBar = document.getElementById('nav-bottom-bar');
+    const etaMainEl = document.getElementById('nav-eta-main');
+    if (navBottomBar) {
+      navBottomBar.style.display = 'flex';
+      navBottomBar.classList.add('skeleton-loading');
+    }
+    if (etaMainEl) {
+      etaMainEl.innerText = 'ACQUIRING ROUTE...';
+    }
+    
     try {
       const route = await this.routeOptimizer.fetchAndOptimizeRoute(
         this.currentOriginCoords,
@@ -543,6 +971,10 @@ class App {
         profile,
         this.routingAbortController.signal
       );
+
+      if (navBottomBar) {
+        navBottomBar.classList.remove('skeleton-loading');
+      }
 
       if (route) {
         // PRE-INIT HUD: Show data before motion starts
@@ -559,6 +991,11 @@ class App {
 
         this.map.executeCameraSequence(this.currentOriginCoords, this.currentDestCoords, route.coordinates);
         this.map.updateRoute(route);
+        
+        // Save to Recent Missions
+        const destName = (document.getElementById('dest-input') as HTMLInputElement).value || 'Target Objective';
+        LocationCache.saveMission(destName, this.currentDestCoords);
+        
         this.startNavigation(route);
       }
     } catch (e) {
@@ -570,7 +1007,18 @@ class App {
     this.tripStartTime = Date.now();
     this.tripTotalDistance = route.distance;
     
+    // Notify native Android wrapper to start foreground service location tracking
+    if ((window as any).AndroidBridge) {
+      try {
+        (window as any).AndroidBridge.startBackgroundNavigation(JSON.stringify(route));
+        (window as any).AndroidBridge.triggerVibration(JSON.stringify({ duration: 150 }));
+      } catch (e) {
+        console.error('[AndroidBridge] Failed to trigger background service:', e);
+      }
+    }
+    
     this.navSystem.start(route, TRANSPORT_PROFILES[this.currentTransportType].mapboxProfile);
+    this.map.enterNavigationMode();
     
     document.getElementById('maneuver-card')!.style.display = 'flex';
     document.getElementById('nav-bottom-bar')!.style.display = 'flex';
@@ -601,18 +1049,72 @@ class App {
     };
   }
 
-  private filterUrbanIntelligence(category: string) {
-    console.log(`[App] Filtering intelligence layer: ${category}`);
-    if (this.map) {
-      this.map.setPoiFilter(category);
-      this.showTacticalNotification(`SCANNING SECTOR FOR: ${category.toUpperCase()}`);
+    private async filterUrbanIntelligence(category: string) {
+        if (category === 'all') {
+            this.showTacticalNotification('SCANNING ALL SECTORS FOR INTEL');
+            this.map.setPoiFilter('all');
+            return;
+        }
+
+        this.showTacticalNotification(`SCANNING SECTOR FOR NEAREST: ${category.toUpperCase()}`);
+        this.map.setPoiFilter(category);
+
+        // AUTO-LOCATE NEAREST LOGIC
+        if (!this.currentOriginCoords) {
+            this.showTacticalNotification('GPS LOCK REQUIRED FOR AUTO-LOCATE', 'warning');
+            return;
+        }
+
+        // Map internal category to Mapbox search terms
+        const categoryMap: Record<string, string> = {
+            hospital: 'hospital,clinic,medical',
+            police: 'police,saps,security',
+            bank: 'bank,atm',
+            fuel: 'gas station,petrol',
+            rank: 'taxi rank,bus station',
+            shisanyama: 'shisanyama,restaurant,braai',
+            spaza: 'spaza,convenience store,grocery',
+            hotel: 'hotel,lodging,guest house',
+            school: 'school,university,college'
+        };
+
+        const searchTerm = categoryMap[category] || category;
+        const [lng, lat] = this.currentOriginCoords;
+        const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(searchTerm)}.json?access_token=${this.token}&proximity=${lng},${lat}&limit=1&country=ZA&language=en`;
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            if (data.features && data.features.length > 0) {
+                const f = data.features[0];
+                const coords: [number, number] = f.center;
+                this.showTacticalNotification(`TARGET ACQUIRED: ${f.text.toUpperCase()}`);
+                
+                // Set as destination and trigger transport view
+                this.handleGeocodingSelection(f.text, coords, 'destination');
+            } else {
+                this.showTacticalNotification(`NO ${category.toUpperCase()} FOUND IN RADIUS`, 'warning');
+            }
+        } catch (e) {
+            console.error('Auto-locate failed:', e);
+        }
     }
-  }
 
   public reportHazard(type: string) {
-    if (!this.currentOriginCoords) return;
+    if (!this.currentOriginCoords) {
+      this.showTacticalNotification('GPS LINK UNAVAILABLE - CANNOT REPORT INCIDENT', 'critical');
+      return;
+    }
     const pos = this.navSystem.getCurrentPosition() || this.currentOriginCoords;
     
+    const typeLabels: Record<string, string> = {
+      pothole: '🕳️ POTHOLE DEBRIS',
+      accident: '💥 VEHICLE COLLISION',
+      roadblock: '🚧 SAPS ROADBLOCK'
+    };
+
+    console.log(`[Crowdsourcing] Uploading hazard: ${type} at ${pos}`);
+
     // 1. Report to Realtime Backend
     realtime.reportHazard(type, pos);
     
@@ -623,7 +1125,14 @@ class App {
       timestamp: Date.now()
     });
     
-    this.speakBriefing(`Reporting ${type} at current location. Broadcasting to network.`);
+    // 3. Audio Briefing Speech
+    this.speakBriefing(`Hazard reported: ${typeLabels[type] || type}. Broadcast sent to all active units.`);
+
+    // 4. Premium HUD Notification overlay
+    this.showTacticalNotification(
+      `FIELD REPORT: ${typeLabels[type] || type.toUpperCase()} UPLOADED SUCCESSFULLY`,
+      type === 'accident' || type === 'roadblock' ? 'warning' : 'info'
+    );
   }
 
   public handleSOSTrigger() {
@@ -653,6 +1162,15 @@ class App {
   }
 
   private stopNavigation() {
+    // Notify native Android wrapper to terminate foreground location service
+    if ((window as any).AndroidBridge) {
+      try {
+        (window as any).AndroidBridge.stopBackgroundNavigation();
+        (window as any).AndroidBridge.triggerVibration(JSON.stringify({ duration: 80 }));
+      } catch (e) {
+        console.error('[AndroidBridge] Failed to stop background service:', e);
+      }
+    }
     this.navSystem.stop();
     this.map.exitNavigationMode();
     this.map.visualEffects.clearRoute();
@@ -699,6 +1217,41 @@ class App {
     }
   }
 
+  private requestCompassPermission() {
+    const sensorBtn = document.createElement('button');
+    sensorBtn.id = 'sensor-permission-gate';
+    sensorBtn.className = 'glass-panel tactical-btn';
+    sensorBtn.style.cssText = 'position:fixed; top:50%; left:50%; transform:translate(-50%,-50%); z-index:9999; padding:20px; font-weight:bold; color:var(--primary-accent); border:2px solid var(--primary-accent);';
+    sensorBtn.innerHTML = 'SYNC TACTICAL COMPASS<br><small style="font-size:0.6rem;opacity:0.7">Enable device sensors for real-time orientation</small>';
+    
+    const DeviceOrientationEventClass = (window as any).DeviceOrientationEvent;
+    
+    const request = async () => {
+      if (DeviceOrientationEventClass && typeof DeviceOrientationEventClass.requestPermission === 'function') {
+        try {
+          const response = await DeviceOrientationEventClass.requestPermission();
+          if (response === 'granted') {
+            console.log('[App] COMPASS_PERMISSION_GRANTED');
+          }
+        } catch (e) {
+          console.error('[App] COMPASS_PERMISSION_ERROR', e);
+        }
+      }
+      sensorBtn.remove();
+      // Force DRIVING mode to start tracking rotation immediately
+      this.map.enterNavigationMode();
+      this.map.recenter();
+    };
+
+    sensorBtn.onclick = request;
+    
+    // Only show if we're on a mobile device and haven't granted yet
+    const hasPermissionRequest = DeviceOrientationEventClass && typeof DeviceOrientationEventClass.requestPermission === 'function';
+    if (hasPermissionRequest || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+      document.body.appendChild(sensorBtn);
+    }
+  }
+
   private initSystemMonitor() {
     systemMonitor.setUpdateCallback((status) => {
       const linkEl = document.getElementById('health-link');
@@ -715,14 +1268,26 @@ class App {
   }
 
   private setupNavigationStateListener() {
+    let isFirstFix = true;
+    let lastUIUpdateTime = 0;
     this.navSystem.onUpdate = (state) => {
+      // Keep operator coordinates perfectly in sync for directions, search origin and recentering
+      this.currentOriginCoords = state.currentPosition;
+      LocationCache.save(state.currentPosition);
+
+      // 1. High-fidelity rendering updates (run at GPS / Orientation frequency for 60fps movement)
       if (this.map) {
-        this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed);
-        if (this.map.visualEffects) {
-          this.map.visualEffects.updateUserVehicle(state.currentPosition, state.heading);
-        }
+        this.map.updateCameraForNav(state.currentPosition, state.heading, state.speed, isFirstFix);
+        if (isFirstFix) isFirstFix = false;
       }
       
+      // 2. Throttling DOM updates to 250ms to prevent CPU saturation and rendering lockouts on low-end mobile devices
+      const now = performance.now();
+      if (!isFirstFix && now - lastUIUpdateTime < 250) {
+        return;
+      }
+      lastUIUpdateTime = now;
+
       const compass = document.getElementById('compass-readout');
       if (compass) compass.innerText = `HEADING: ${state.compassDirection.toUpperCase()}`;
 
@@ -744,12 +1309,14 @@ class App {
       if (navBottomBar && navBottomBar.style.display === 'flex') {
         const speedMs = state.speed > 1 ? state.speed : 13.8; 
         const remainingSeconds = state.totalDistanceRemaining / speedMs;
-        
-        const etaEl = document.getElementById('nav-eta-time');
-        const distEl = document.getElementById('nav-distance');
+        const etaMainEl = document.getElementById('nav-eta-main');
+        const etaTimeEl = document.getElementById('nav-eta-time');
+        const distEl = document.getElementById('nav-dist-left');
         const arrivalEl = document.getElementById('nav-arrival');
         
-        if (etaEl) etaEl.innerText = this.formatDuration(remainingSeconds);
+        const etaText = this.formatDuration(remainingSeconds);
+        if (etaMainEl) etaMainEl.innerText = etaText;
+        if (etaTimeEl) etaTimeEl.innerText = etaText;
         if (distEl) distEl.innerText = `${(state.totalDistanceRemaining / 1000).toFixed(1)} km`;
         
         if (arrivalEl) {
@@ -840,6 +1407,137 @@ class App {
     if (hrs > 0) return `${hrs}h ${mins}m`;
     return `${mins} min`;
   }
+
+  public onAndroidGPSUpdate(lng: number, lat: number, speed: number, bearing: number) {
+    console.log(`[AndroidBridge] GPS Update: ${lng}, ${lat}, speed: ${speed}, bearing: ${bearing}`);
+    const coords: [number, number] = [lng, lat];
+    this.currentOriginCoords = coords;
+    
+    if (this.map) {
+      // Direct, low-latency WebGL coordinate and camera follow updates
+      this.map.updateCameraForNav(coords, bearing, speed, false);
+      this.navSystem.snapToPosition(coords, speed);
+    }
+  }
+
+  public startDemoSimulation() {
+    // If no coordinates, set Joburg CBD defaults
+    this.currentOriginCoords = [28.0435, -26.1952]; // Park Station
+    this.currentDestCoords = [28.0494, -26.1076]; // Sandton City (~15 KM Route)
+
+    this.showTacticalNotification("MOCKING 15 KM ROUTE TO SANDTON CITY...");
+    
+    // Trigger routing
+    this.routeOptimizer.fetchAndOptimizeRoute(
+      this.currentOriginCoords,
+      this.currentDestCoords,
+      'driving'
+    ).then(route => {
+      if (route && route.coordinates.length > 1) {
+        this.map.executeCameraSequence(this.currentOriginCoords!, this.currentDestCoords!, route.coordinates);
+        this.map.updateRoute(route);
+        this.startNavigation(route);
+        if (this.map.cameraController) {
+          this.map.cameraController.setMode('CINEMATIC' as any);
+        }
+
+        // Cancel any existing interval
+        if ((window as any).currentSimulationInterval) {
+          cancelAnimationFrame((window as any).currentSimulationInterval);
+        }
+
+        const coords = route.coordinates;
+        let currentLegIndex = 0;
+        let legProgress = 0; 
+        
+        const speedKmh = 20; // 20 KM/H slow driving speed
+        const speedMs = speedKmh / 3.6; // 5.56 m/s
+
+        const getDist = (p1: [number, number], p2: [number, number]) => {
+          const R = 6371e3;
+          const f1 = p1[1] * Math.PI/180;
+          const f2 = p2[1] * Math.PI/180;
+          const df = (p2[1]-p1[1]) * Math.PI/180;
+          const dl = (p2[0]-p1[0]) * Math.PI/180;
+          const a = Math.sin(df/2) * Math.sin(df/2) + Math.cos(f1) * Math.cos(f2) * Math.sin(dl/2) * Math.sin(dl/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          return R * c;
+        };
+
+        const interpolate = (p1: [number, number], p2: [number, number], fraction: number): [number, number] => {
+          return [p1[0] + (p2[0] - p1[0]) * fraction, p1[1] + (p2[1] - p1[1]) * fraction];
+        };
+
+        const getBearing = (p1: [number, number], p2: [number, number]) => {
+          const y = Math.sin((p2[0]-p1[0])*Math.PI/180) * Math.cos(p2[1]*Math.PI/180);
+          const x = Math.cos(p1[1]*Math.PI/180)*Math.sin(p2[1]*Math.PI/180) -
+                    Math.sin(p1[1]*Math.PI/180)*Math.cos(p2[1]*Math.PI/180)*Math.cos((p2[0]-p1[0])*Math.PI/180);
+          return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+        };
+
+        let lastTime = performance.now();
+        let totalTraveled = 0;
+
+        const animate = (time: number) => {
+          const dt = (time - lastTime) / 1000;
+          lastTime = time;
+
+          const clampedDt = Math.min(dt, 0.1); // prevent massive jumps
+          const distanceToTravel = speedMs * clampedDt;
+          
+          legProgress += distanceToTravel;
+          totalTraveled += distanceToTravel;
+
+          let p1 = coords[currentLegIndex];
+          let p2 = coords[currentLegIndex + 1];
+          let legLength = getDist(p1, p2);
+
+          while (legProgress >= legLength) {
+            legProgress -= legLength;
+            currentLegIndex++;
+            if (currentLegIndex >= coords.length - 1) {
+               this.showTacticalNotification("SIMULATION COMPLETED");
+               this.stopNavigation();
+               return; 
+            }
+            p1 = coords[currentLegIndex];
+            p2 = coords[currentLegIndex + 1];
+            legLength = getDist(p1, p2);
+          }
+
+          const fraction = legLength === 0 ? 0 : legProgress / legLength;
+          const currentPos = interpolate(p1, p2, fraction);
+          const heading = getBearing(p1, p2);
+
+          this.currentOriginCoords = currentPos;
+          if (this.map) {
+            this.map.updateCameraForNav(currentPos, heading, speedMs, currentLegIndex === 0 && legProgress < 2);
+            if (this.map.visualEffects) {
+              this.map.visualEffects.updateUserVehicle(currentPos, heading);
+            }
+          }
+
+          const distRemaining = Math.max(0, route.distance - totalTraveled);
+          const durationRemaining = distRemaining / speedMs;
+
+          const etaVal = document.getElementById('nav-eta-time');
+          const distVal = document.getElementById('nav-dist-left');
+
+          if (etaVal) etaVal.innerText = `${Math.ceil(durationRemaining / 60)} min`;
+          if (distVal) distVal.innerText = `${(distRemaining / 1000).toFixed(1)} km`;
+
+          (window as any).currentSimulationInterval = requestAnimationFrame(animate);
+        };
+
+        this.showTacticalNotification(`DRIVING SIMULATION STARTED: ${speedKmh} KM/H`);
+        (window as any).currentSimulationInterval = requestAnimationFrame(animate);
+      }
+    }).catch(err => {
+      console.error("Simulation routing failed:", err);
+      this.showTacticalNotification("SIMULATION ROUTING FAILED");
+    });
+  }
 }
 
-new App();
+const appInstance = new App();
+(window as any).appInstance = appInstance;
