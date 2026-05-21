@@ -97,6 +97,26 @@ export class MapRenderer {
       this.map.on('mouseleave', 'poi-label', () => {
         this.map.getCanvas().style.cursor = '';
       });
+
+      // Fix Mapbox NavigationControl 3D/2D button text logic to show CURRENT state
+      setTimeout(() => {
+        const pitchBtn = document.querySelector('.mapboxgl-ctrl-pitch');
+        if (pitchBtn) {
+          const updateText = () => {
+            const is2D = this.map.getPitch() === 0;
+            const desiredText = is2D ? '2D' : '3D';
+            if (pitchBtn.textContent !== desiredText) {
+              pitchBtn.textContent = desiredText;
+            }
+          };
+          
+          const observer = new MutationObserver(updateText);
+          observer.observe(pitchBtn, { childList: true, characterData: true, subtree: true });
+          updateText();
+          
+          this.map.on('pitch', updateText);
+        }
+      }, 1000);
     });
 
     // Global intelligence updates
