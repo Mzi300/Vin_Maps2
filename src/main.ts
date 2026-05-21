@@ -7,6 +7,7 @@ import { RouteOptimizer } from './engine/routeOptimizer';
 import type { OptimizedRoute } from './engine/routeOptimizer';
 import { NavigationSystem } from './engine/navigationSystem';
 import './style/index.css';
+import { getAuthState, setAuthState, isAuthenticated, AuthState } from './auth';
 
 window.addEventListener('error', (e) => {
   const root = document.querySelector<HTMLDivElement>('#app');
@@ -30,6 +31,7 @@ class App {
   private tripTotalDistance: number = 0;
   private geocodingAbortController: AbortController | null = null;
   private routingAbortController: AbortController | null = null;
+    private authState: AuthState = getAuthState();
 
   constructor() {
     this.init();
@@ -51,7 +53,12 @@ class App {
         <div id="sidebar" class="glass-panel sidebar-panel">
           <div class="sidebar-header">
             <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
-            <button id="close-sidebar" class="close-btn">×</button>
+                <button id="close-sidebar" class="close-btn">×</button>
+                <div id="auth-section" class="auth-section">
+                  <button id="login-btn" class="sidebar-item">👤 Login / Sign In</button>
+                  <button id="guest-btn" class="sidebar-item">🛰️ Enter Guest Mode</button>
+                  <div id="guest-badge" class="guest-badge">Guest Mode</div>
+                </div>
           </div>
           <div class="sidebar-content">
             <div class="sidebar-section">
@@ -249,6 +256,7 @@ class App {
     });
 
     this.setupListeners();
+    this.updateAuthUI();
   }
 
   private debounce(func: Function, wait: number) {
@@ -296,8 +304,12 @@ class App {
         sidebar?.classList.remove('open');
         
         if (text.includes('Saved Sectors')) {
-          this.map.flyTo(28.0473, -26.2041, 15);
-          this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
+          if (!isAuthenticated()) {
+            this.showLockMessage('Sign in to save sectors to cloud.');
+          } else {
+            this.map.flyTo(28.0473, -26.2041, 15);
+            this.showTacticalNotification('NAVIGATING TO SECTOR: ALPHA-ONE');
+          }
         } else if (text.includes('Recent Missions')) {
           this.showTacticalNotification('LOADING MISSION ARCHIVES...');
         }
@@ -513,6 +525,10 @@ class App {
   }
 
   public reportHazard(type: string) {
+    if (!isAuthenticated()) {
+      this.showLockMessage('Sign in to unlock live tactical intelligence and community-powered road updates.');
+      return;
+    }
     if (!this.currentOriginCoords) return;
     const pos = this.navSystem.getCurrentPosition() || this.currentOriginCoords;
     intelligence.report({
@@ -568,7 +584,24 @@ class App {
       utterance.rate = 1.1;
       window.speechSynthesis.speak(utterance);
     }
-  }
+
+
+    private updateAuthUI() {
+      const badge = document.getElementById('guest-badge');
+      const loginBtn = document.getElementById('login-btn');
+      if (this.authState === AuthState.Authenticated) {
+        if (badge) badge.style.display = 'none';
+        if (loginBtn) loginBtn.innerText = '👤 Logout';
+      } else {
+        if (badge) badge.style.display = 'block';
+        if (loginBtn) loginBtn.innerText = '👤 Login / Sign In';
+      }
+    }
+
+    private showLockMessage(message: string) {
+      this.showTacticalNotification(message);
+    }
+
 
   private setupNavigationStateListener() {
     this.navSystem.onUpdate = (state) => {
@@ -638,6 +671,10 @@ class App {
   }
 
   private async filterUrbanIntelligence(category: string) {
+    if (!isAuthenticated()) {
+      this.showLockMessage('Sign in to access community intelligence.');
+      return;
+    }
     const center = this.map.map.getCenter();
     
     const statusText = document.getElementById('loader-status');
