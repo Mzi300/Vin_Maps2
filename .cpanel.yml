@@ -1,5 +1,1 @@
----
-deployment:
-  tasks:
-    - export DEPLOYPATH=/home/livenets/public_html/
-    - /bin/cp -R dist/* $DEPLOYPATH
+post-pull: ./post-pull.sh
