@@ -1,8 +1,8 @@
 :root {
   --primary-accent: #00f2ff;
   --secondary-accent: #7000ff;
-  --bg-dark: #050505;
-  --panel-bg: rgba(15, 15, 15, 0.7);
+  --bg-dark: #111111;
+  --panel-bg: rgba(30, 30, 30, 0.7);
   --glass-border: rgba(255, 255, 255, 0.1);
   --text-main: #ffffff;
   --text-dim: #a0a0a0;
@@ -12,6 +12,7 @@
   
   --font-main: 'Inter', system-ui, -apple-system, sans-serif;
 }
+
 
 * {
   margin: 0;

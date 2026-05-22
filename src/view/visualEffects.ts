@@ -12,6 +12,11 @@ export class VisualEffects {
   private threeVehicleLayer!: ThreeVehicleLayer;
   private userLocationMarker: mapboxgl.Marker | null = null;
   private destMarker: mapboxgl.Marker | null = null;
+  // Current vehicle speed in km/h (set by navigation engine)
+  private currentSpeed: number = 0;
+  // Rendering mode flag – true for 3D (premium), false for 2D
+  private is3DMode: boolean = true;
+
   private arrowOffset: number = 0;
   private lastStableCoords: [number, number] = [0, 0];
 
@@ -149,6 +154,30 @@ export class VisualEffects {
   }
 
   private isNavigating: boolean = false;
+  /**
+   * Called by the navigation engine to inform the visual effects of the vehicle's speed.
+   * Speed is in km/h. Values < 1 are considered stationary.
+   */
+  public setVehicleSpeed(speedKmh: number) {
+    this.currentSpeed = speedKmh;
+  }
+
+  /**
+   * Switch between 2D and 3D rendering modes.
+   * When entering 2D, the 3D vehicle layer is hidden and the classic marker is shown.
+   * When entering 3D, the marker is hidden and the 3D layer is shown.
+   */
+  public setRenderingMode(is3D: boolean) {
+    this.is3DMode = is3D;
+    if (this.vehicleMarker) {
+      this.vehicleMarker.getElement().style.display = is3D ? 'none' : '';
+    }
+    // Ensure the 3D layer visibility matches the mode
+    if (this.map && this.map.getLayer('3d-vehicle-layer')) {
+      this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', is3D ? 'visible' : 'none');
+    }
+  }
+
   public setNavigating(active: boolean) {
     this.isNavigating = active;
     if (this.destMarker) {
@@ -208,36 +237,56 @@ export class VisualEffects {
   public updateUserVehicle(coords: [number, number], heading: number) {
     if (!this.map) return;
 
-    // 1. Handle 2D Marker (Hide it for premium 3D look)
+    // 1. Show/hide the 2D marker based on current rendering mode
     if (this.vehicleMarker) {
-      this.vehicleMarker.getElement().style.display = 'none';
+      // In 3D mode we hide the classic marker, otherwise we show it
+      this.vehicleMarker.getElement().style.display = this.is3DMode ? 'none' : '';
     }
 
-    // 2. Handle 3D Vehicle Layer
+    // 2. Update the 3D vehicle layer with speed‑aware logic
     if (this.threeVehicleLayer) {
       try {
         if (this.map.getLayer('3d-vehicle-layer')) {
-          // First update should always show the vehicle
+          // Ensure the vehicle is visible
+          this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
+
+          // If this is the very first update, simply place the vehicle
           if (this.lastStableCoords[0] === 0) {
-            this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
             this.threeVehicleLayer.updatePosition(coords, heading);
             this.lastStableCoords = [...coords];
             return;
           }
 
-          // Less strict motion gating: only update if moved > 0.5m
           const dist = this.calculateDistance(this.lastStableCoords, coords);
-          if (dist > 0.5) { 
-            this.map.setLayoutProperty('3d-vehicle-layer', 'visibility', 'visible');
+
+          // Always update position when the vehicle moves more than 0.5 m
+          if (dist > 0.5) {
             this.threeVehicleLayer.updatePosition(coords, heading);
             this.lastStableCoords = [...coords];
-            
-            // Periodically force to top to prevent building occlusion
-            this.map.moveLayer('3d-vehicle-layer');
           }
+
+          // Heading handling based on speed
+          if (this.currentSpeed < 1) {
+            // Stationary or very low speed – lock heading to the initial bearing
+            // (do not call updatePosition with a new heading)
+            // No extra action needed because we didn't change heading above.
+          } else if (this.currentSpeed <= 5) {
+            // Low‑speed movement – apply heavy smoothing to heading changes
+            const smoothFactor = 0.3; // lower = smoother
+            const prevHeading = (this.threeVehicleLayer as any).lastHeading ?? heading;
+            const delta = ((heading - prevHeading + 540) % 360) - 180; // shortest angle
+            const smoothed = (prevHeading + delta * smoothFactor + 360) % 360;
+            this.threeVehicleLayer.updatePosition(coords, smoothed);
+          } else {
+            // Normal speed – use raw heading for immediate response
+            this.threeVehicleLayer.updatePosition(coords, heading);
+          }
+
+          // Ensure the layer stays on top of the style stack
+          this.map.moveLayer('3d-vehicle-layer');
         }
       } catch (e) {
-        console.warn("[VisualEffects] 3D Vehicle sync error:", e);
+        console.warn('[VisualEffects] 3D Vehicle sync error:', e);
       }
     }
 
