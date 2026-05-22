@@ -52,13 +52,11 @@ class App {
         
         <div id="sidebar" class="glass-panel sidebar-panel">
           <div class="sidebar-header">
-            <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
-                <button id="close-sidebar" class="close-btn">×</button>
-                <div id="auth-section" class="auth-section">
-                  <button id="login-btn" class="sidebar-item">👤 Login / Sign In</button>
-                  <button id="guest-btn" class="sidebar-item">🛰️ Enter Guest Mode</button>
-                  <div id="guest-badge" class="guest-badge">Guest Mode</div>
-                </div>
+          <h2 style="color:var(--primary-accent); font-size:1.2rem;">VIMAPS COMMAND</h2>
+          <div class="auth-section" id="auth-section">
+            <button id="login-btn" class="login-btn">👤 Access VinMaps Intelligence Network</button>
+            <p class="auth-helper">Navigate freely without login. Sign in to unlock synced missions, saved sectors, map intelligence, contribution history, stealth preferences, and cross-device access.</p>
+          </div>
           </div>
           <div class="sidebar-content">
             <div class="sidebar-section">

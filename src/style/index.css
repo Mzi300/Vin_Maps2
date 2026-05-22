@@ -100,7 +100,31 @@ body {
   pointer-events: none;
 }
 
-.glass-panel {
+.auth-section {
+  margin-top: 12px;
+  text-align: center;
+}
+
+.login-btn {
+  background: var(--primary-accent);
+  color: #000;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  transition: background 0.2s;
+}
+.login-btn:hover {
+  background: var(--accent-hover);
+}
+
+.auth-helper {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
