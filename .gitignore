@@ -22,6 +22,7 @@ out/
 .next/
 .nuxt/
 
+dist/
 # =========================
 # ENVIRONMENT FILES (CRITICAL)
 # =========================
