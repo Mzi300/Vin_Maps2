@@ -7,7 +7,7 @@ import { RouteOptimizer } from './engine/routeOptimizer';
 import type { OptimizedRoute } from './engine/routeOptimizer';
 import { NavigationSystem } from './engine/navigationSystem';
 import './style/index.css';
-import { getAuthState, setAuthState, isAuthenticated, AuthState } from './auth';
+import { getAuthState, isAuthenticated, AuthState } from './auth';
 
 window.addEventListener('error', (e) => {
   const root = document.querySelector<HTMLDivElement>('#app');
@@ -582,9 +582,11 @@ class App {
       utterance.rate = 1.1;
       window.speechSynthesis.speak(utterance);
     }
+}
 
 
-  // Authentication UI updater
+
+// Authentication UI updater
 private updateAuthUI() {
     const badge = document.getElementById('guest-badge');
     const loginBtn = document.getElementById('login-btn');
@@ -595,6 +597,10 @@ private updateAuthUI() {
       if (badge) badge.style.display = 'block';
       if (loginBtn) loginBtn.innerText = '👤 Login / Sign In';
     }
+  }
+
+
+
 
 
     private showLockMessage(message: string) {

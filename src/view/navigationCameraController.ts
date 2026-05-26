@@ -97,6 +97,19 @@ export class NavigationCameraController {
       // Logic handled by manual Mapbox interactions
     },
     // New modes
+    [CameraMode.CINEMATIC]: {
+      // Simplified cinematic preset, similar to DRIVING
+      pitch: 68,
+      zoom: 16.2,
+      padding: { bottom: 180 },
+      lerpPos: 0.15,
+      lerpBearing: 0.12,
+      lerpPitch: 0.06,
+      lerpZoom: 0.06,
+      rollIntensity: 0.4,
+      lookAhead: 3.5,
+      lowSpeedLerpBearing: 0.04
+    },
     [CameraMode.NORTH_UP]: {
       // Keep bearing fixed to true north (0°), pitch and zoom same as DRIVING baseline
       bearing: 0,
@@ -245,7 +258,7 @@ export class NavigationCameraController {
 
     // Handle stationary/low‑speed jitter and mode‑specific bearing logic
     const minHeadingSpeed = 0.5; // speed (km/h) above which we consider heading reliable
-    const lowSpeedThreshold = 5; // km/h
+
     // Minimal bearing change to apply (degrees) – avoids jitter from GPS/compass noise
 
     // Determine which bearing should be used based on mode and speed
