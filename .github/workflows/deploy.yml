@@ -1,4 +1,4 @@
-name: Deploy to Live Server
+# name: Deploy to Live Server
 
 on:
   push:
@@ -23,23 +23,23 @@ jobs:
       - name: Build Vite app
         run: npm run build
 
-      - name: Deploy via SCP
+      - name: Deploy via SCP (password authentication)
         uses: appleboy/scp-action@v0.1.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           source: "dist/*"
           target: "/home/livenets/public_html/"
 
-      # Optional: clean up old files on the server (remove extraneous files)
+      # Optional: clean up old files on the server (password authentication)
       - name: Cleanup remote directory (optional)
         uses: appleboy/ssh-action@v0.1.5
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          password: ${{ secrets.DEPLOY_PASSWORD }}
           script: |
             cd /home/livenets/public_html
-            # Remove files that are not part of the new build
+            # Remove files that are not part of the new build (keep index.html, favicon.svg, icons.svg)
             find . -type f ! -name "index.html" ! -name "favicon.svg" ! -name "icons.svg" -delete

@@ -584,17 +584,18 @@ class App {
     }
 
 
-    private updateAuthUI() {
-      const badge = document.getElementById('guest-badge');
-      const loginBtn = document.getElementById('login-btn');
-      if (this.authState === AuthState.Authenticated) {
-        if (badge) badge.style.display = 'none';
-        if (loginBtn) loginBtn.innerText = '👤 Logout';
-      } else {
-        if (badge) badge.style.display = 'block';
-        if (loginBtn) loginBtn.innerText = '👤 Login / Sign In';
-      }
+  // Authentication UI updater
+private updateAuthUI() {
+    const badge = document.getElementById('guest-badge');
+    const loginBtn = document.getElementById('login-btn');
+    if (this.authState === AuthState.Authenticated) {
+      if (badge) badge.style.display = 'none';
+      if (loginBtn) loginBtn.innerText = '👤 Logout';
+    } else {
+      if (badge) badge.style.display = 'block';
+      if (loginBtn) loginBtn.innerText = '👤 Login / Sign In';
     }
+
 
     private showLockMessage(message: string) {
       this.showTacticalNotification(message);
