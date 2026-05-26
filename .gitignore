@@ -22,7 +22,7 @@ out/
 .next/
 .nuxt/
 
-dist/
+# dist/  # keep for deployment
 # =========================
 # ENVIRONMENT FILES (CRITICAL)
 # =========================
