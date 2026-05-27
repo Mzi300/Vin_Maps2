@@ -125,6 +125,7 @@ body {
   margin-top: 4px;
 }
 
+.suggestions-panel {
   background: var(--panel-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
