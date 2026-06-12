@@ -1,6 +1,6 @@
 
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { APP_GUARD } from '@nestjs/core';
+import { APP_GUARD, NestModule, MiddlewareConsumer } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -10,7 +10,12 @@ import { AppService } from './app.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ApiKeyGuard } from './api-key.guard';
 import { AuthModule } from './modules/auth/auth.module';
+import { PromotionsModule } from './modules/promotions/promotions.module';
+import { PlacesModule } from './modules/places/places.module';
 import { UsersModule } from './modules/users/users.module';
+import { ApiUsageModule } from './modules/api-usage/api-usage.module';
+import { ScheduleModule } from '@nestjs/schedule';
+import { ApiUsageMiddleware } from './modules/api-usage/api-usage.middleware';
 import { RoutingModule } from './modules/routing/routing.module';
 import { TrafficModule } from './modules/traffic/traffic.module';
 import { IncidentsModule } from './modules/incidents/incidents.module';
@@ -49,6 +54,10 @@ import jwtConfig from './config/jwt.config';
     }),
     EventEmitterModule.forRoot(),
     AuthModule,
+    ApiUsageModule,
+    ScheduleModule.forRoot(),
+    PlacesModule,
+    PromotionsModule,
     UsersModule,
     RoutingModule,
     TrafficModule,
@@ -69,5 +78,8 @@ import jwtConfig from './config/jwt.config';
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: ApiKeyGuard },
   ],
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(require('./middleware/analytics.middleware').default).forRoutes('*');
+  },
 })
 export class AppModule {}

@@ -20,5 +20,18 @@ export const envValidationSchema = Joi.object({
   // Authentication
   JWT_SECRET: Joi.string().required(),
   JWT_EXPIRATION: Joi.string().required(),
-  API_KEY: Joi.string().required(),
+
+  // API Secrets
+  MAPBOX_TOKEN: Joi.string().required(),
+  TRAFFIC_API_KEY: Joi.string().required(),
+  // TomTom Quota
+  TOMTOM_QUOTA_DAILY: Joi.number().default(10000),
+  // API Usage
+  API_USAGE_RETENTION_DAYS: Joi.number().default(90),
+  // Analytics
+  ANALYTICS_RETENTION_DAYS: Joi.number().default(30),
+  // Promotions
+  PROMOTION_RETENTION_DAYS: Joi.number().default(90),
+  // Business limits
+  MAX_FREE_PLACES: Joi.number().default(10),
 });
