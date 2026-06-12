@@ -1,0 +1,56 @@
+/* Premium theme with dark mode and glassmorphism */
+:root {
+  /* Light theme */
+  --color-primary: hsl(210, 78%, 56%);
+  --color-background: hsl(0, 0%, 100%);
+  --color-surface: hsla(0, 0%, 100%, 0.8);
+  --color-text: hsl(210, 12%, 15%);
+  --color-muted: hsl(210, 14%, 90%);
+}
+
+[data-theme="dark"] {
+  --color-primary: hsl(210, 78%, 64%);
+  --color-background: hsl(210, 12%, 12%);
+  --color-surface: hsla(210, 12%, 18%, 0.8);
+  --color-text: hsl(0, 0%, 95%);
+  --color-muted: hsl(210, 13%, 20%);
+}
+
+/* Glassmorphism utility class */
+.glass {
+  background: var(--color-surface);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* Smooth hover animation */
+.transition {
+  transition: all 0.25s ease-in-out;
+}
+
+/* Example button styling */
+.btn {
+  background: var(--color-primary);
+  color: var(--color-background);
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+/* Global body styling */
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--color-background);
+  color: var(--color-text);
+}
