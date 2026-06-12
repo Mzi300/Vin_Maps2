@@ -22,8 +22,8 @@ export class TelemetryGateway implements OnGatewayConnection, OnGatewayDisconnec
     console.log(`Client disconnected: ${client.id}`);
   }
 
-  broadcastLocationUpdate(data: any) {
-    // In the future this should be broadcasted to specific geo-fenced rooms
-    this.server.emit('location_update', data);
+  broadcastVoiceCommand(data: any) {
+    // Emit voice command to connected clients
+    this.server.emit('voice_command', data);
   }
 }

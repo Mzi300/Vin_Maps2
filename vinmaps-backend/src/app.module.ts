@@ -21,7 +21,8 @@ import { HealthModule } from './modules/health/health.module';
 import { VerificationModule } from './modules/verification/verification.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { AppCacheModule } from './cache/cache.module';
-import { ObservabilityModule } from './observability/observability.module';
+import { VoiceModule } from './voice/voice.module';
+import { PreferencesModule } from './preferences/preferences.module';
 
 import { envValidationSchema } from './config/env.validation';
 import jwtConfig from './config/jwt.config';
@@ -59,8 +60,8 @@ import jwtConfig from './config/jwt.config';
     VerificationModule,
     NotificationsModule,
     AppCacheModule,
+    VoiceModule,
     ObservabilityModule,
-    AiModule,
   ],
   controllers: [AppController],
   providers: [

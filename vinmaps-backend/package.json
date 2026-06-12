@@ -47,13 +47,15 @@
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "typeorm": "^1.0.0",
-    "@opentelemetry/api": "^1.8.0",
+    "@opentelemetry/api": "1.4.0",
     "@opentelemetry/sdk-node": "^0.41.0",
     "@opentelemetry/exporter-prometheus": "^0.41.0",
-    "@nestjs/otel": "^1.0.0",
+    "nestjs-otel": "^1.8.2",
     "cache-manager-redis-store": "^2.0.0",
-    "nest-winston": "^2.0.0",
+    "nest-winston": "^1.10.2",
     "winston": "^3.13.0",
+    "@google-cloud/speech": "^7.3.2",
+    "multer": "^1.4.5-lts.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

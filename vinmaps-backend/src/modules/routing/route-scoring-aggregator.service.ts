@@ -30,9 +30,9 @@ export class RouteScoringAggregatorService {
     private readonly eventEmitter: EventEmitter2
   ) {}
 
-  async evaluateRoute(candidate: RouteCandidate): Promise<EvaluatedRoute> {
+  async evaluateRoute(candidate: RouteCandidate, userId: number): Promise<EvaluatedRoute> {
     // 1. Core Rule Engine (Always Execute)
-    const ruleResult = await this.ruleBasedService.evaluateCandidate(candidate);
+    const ruleResult = await this.ruleBasedService.evaluateCandidate(candidate, userId);
 
     // Default Fallback State
     let finalScore = ruleResult.score;

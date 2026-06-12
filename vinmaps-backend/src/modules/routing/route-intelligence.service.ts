@@ -14,7 +14,7 @@ export class RouteIntelligenceService {
     private readonly geoService: GeoService,
   ) {}
 
-  async calculateSmartRoutes(startLat: number, startLng: number, endLat: number, endLng: number) {
+  async calculateSmartRoutes(startLat: number, startLng: number, endLat: number, endLng: number, userId: number) {
     const cacheKey = `${startLat.toFixed(4)},${startLng.toFixed(4)}_${endLat.toFixed(4)},${endLng.toFixed(4)}`;
     
     // Check Cache (30 sec TTL)
@@ -33,7 +33,7 @@ export class RouteIntelligenceService {
 
     // 2. Evaluate all candidates via Aggregator (Rule Base + ML Base)
     const evaluatedRoutes: EvaluatedRoute[] = await Promise.all(
-      candidates.map(c => this.aggregatorService.evaluateRoute(c))
+      candidates.map(c => this.aggregatorService.evaluateRoute(c, userId))
     );
 
     // 3. Rank Routes

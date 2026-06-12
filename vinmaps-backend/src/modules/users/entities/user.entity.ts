@@ -1,13 +1,6 @@
-import {
-  Entity,
-  PrimaryGeneratedColumn,
-  Column,
-  CreateDateColumn,
-  UpdateDateColumn,
-  Index,
-} from 'typeorm';
-
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index, OneToMany } from 'typeorm';
 import { UserRole } from '../enums/user-role.enum';
+import { Preference } from '../../preferences/entities/preference.entity';
 
 @Entity('users')
 export class User {
@@ -62,4 +55,7 @@ export class User {
 
   @UpdateDateColumn()
   updatedAt: Date;
+
+  @OneToMany(() => Preference, (pref) => pref.user)
+  preferences: Preference[];
 }

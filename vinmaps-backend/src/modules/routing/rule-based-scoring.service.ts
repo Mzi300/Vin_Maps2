@@ -17,17 +17,25 @@ export interface RuleBasedResult {
 
 @Injectable()
 export class RuleBasedScoringService {
+import { PreferencesService } from '../../preferences/preferences.service';
+
   constructor(
     private readonly incidentsService: IncidentsService,
     private readonly clusteringService: TelemetryClusteringService,
     private readonly safetyZonesService: SafetyZonesService,
     private readonly geoService: GeoService,
+    private readonly preferencesService: PreferencesService,
   ) {}
 
-  async evaluateCandidate(route: RouteCandidate): Promise<RuleBasedResult> {
+  async evaluateCandidate(route: RouteCandidate, userId: number): Promise<RuleBasedResult> {
+    // Fetch user preferences
+    const prefs = await this.preferencesService.findOne(userId).catch(() => null);
     let penalty = 0;
     const warnings: string[] = [];
     const radiusKm = (route.distanceKm / 2) + 2;
+
+    // Existing logic unchanged (incidents, traffic, safety zones)
+    // ... (the rest of the method will be updated below)
     
     let trafficHitCount = 0;
     let trafficLevelSum = 0;
@@ -76,8 +84,37 @@ export class RuleBasedScoringService {
       }
     }
 
-    penalty += route.distanceKm * 1;
+    // Apply distance penalty (base)
+    const distancePenalty = route.distanceKm * 1;
+    penalty += distancePenalty;
 
+    // Apply user preferences if available
+    if (prefs) {
+      // Preferred speed deviation penalty (small weight)
+      const speedDiff = Math.abs(prefs.preferredSpeedKmh - 80);
+      penalty += speedDiff * 0.1;
+
+      // Vehicle type multiplier (affects all non‑distance penalties)
+      let vehicleMultiplier = 1;
+      if (prefs.vehicleType === 'truck') {
+        vehicleMultiplier = 1.2;
+      } else if (prefs.vehicleType === 'motorcycle') {
+        vehicleMultiplier = 0.8;
+      }
+      // Apply multiplier to the part of the penalty that isn't distance based
+      const nonDistancePenalty = penalty - distancePenalty;
+      penalty = nonDistancePenalty * vehicleMultiplier + distancePenalty;
+
+      // Avoid tolls: add a small penalty if a police checkpoint (used as proxy for toll) was encountered
+      if (prefs.avoidTolls) {
+        const hasToll = nearbyIncidents.some(i => i.type === 'POLICE_CHECKPOINT');
+        if (hasToll) {
+          penalty += 2; // modest extra penalty for toll avoidance
+        }
+      }
+    }
+
+    // Compute final score
     let score = 100 - penalty;
     if (score < 0) score = 0;
 
