@@ -1,20 +1,76 @@
 version: '3.8'
+
 services:
   db:
     image: postgis/postgis:15-3.3
+    container_name: vinmaps_db
     environment:
-      POSTGRES_DB: vinmaps
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: ${DB_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_DATABASE:-vinmaps}
     ports:
-      - "5432:5432"
+      - '${DB_PORT:-5432}:5432'
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - vinmaps_db_data:/var/lib/postgresql/data
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
+    container_name: vinmaps_redis
     ports:
-      - "6379:6379"
+      - '6379:6379'
+    volumes:
+      - vinmaps_redis_data:/data
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./vinmaps-backend
+      dockerfile: Dockerfile
+    container_name: vinmaps_backend
+    environment:
+      - DATABASE_HOST=db
+      - DATABASE_PORT=5432
+      - DATABASE_USERNAME=${DB_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DB_PASSWORD:-postgres}
+      - DATABASE_NAME=${DB_DATABASE:-vinmaps}
+      - REDIS_HOST=redis
+    ports:
+      - '3000:3000'
+    depends_on:
+      - db
+      - redis
+    deploy:
+      replicas: 3
+      restart_policy:
+        condition: on-failure
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    build:
+      context: ./Vin_Maps2
+      dockerfile: Dockerfile
+    container_name: vinmaps_frontend
+    ports:
+      - '8080:80'
+    depends_on:
+      - backend
+
+  proxy:
+    image: nginx:alpine
+    container_name: vinmaps_proxy
+    ports:
+      - '80:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - frontend
+      - backend
 
 volumes:
-  postgres_data:
+  vinmaps_db_data:
+  vinmaps_redis_data:
