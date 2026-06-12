@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VinMaps – Navigation Demo</title>
+  <link rel="stylesheet" href="style.css" />
+  <!-- MapLibre CSS -->
+  <link href="https://unpkg.com/maplibre-gl@3.5.0/dist/maplibre-gl.css" rel="stylesheet" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>VinMaps</h1>
+    <button id="day-night-toggle" aria-label="Toggle day/night map" class="day-night-toggle">🌓</button>
+      <span class="icon-sun">☀️</span>
+      <span class="icon-moon">🌙</span>
+    </button>
+  </header>
+<aside class="explore-panel" style="position:absolute;top:80px;right:20px;background:var(--panel-bg);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:12px;padding:1rem;z-index:1000;max-height:60vh;overflow:auto;">
+  <input id="explore-search" class="explore-search" placeholder="Search explore..." style="padding:0.5rem;border-radius:4px;border:none;outline:none;width:200px;margin-bottom:0.5rem;"/>
+  <ul id="explore-list" style="list-style:none;padding:0;margin:0;max-height:200px;overflow-y:auto;"></ul>
+</aside>
+    <aside class="trip-planner" style="position:absolute;top:80px;right:250px;background:var(--panel-bg);backdrop-filter:blur(12px);border:1px solid var(--glass-border);border-radius:12px;padding:1rem;z-index:1000;max-height:70vh;overflow:auto;">
+      <h3 style="margin-top:0;color:var(--primary-accent);">Trip Planner</h3>
+      <div style="margin-bottom:0.5rem;">
+        <input id="origin-input" class="mini-input" placeholder="Origin (lon,lat)" style="width:100%;"/>
+      </div>
+      <div id="stops-container" style="margin-bottom:0.5rem;">
+        <!-- stop rows will be inserted here -->
+      </div>
+      <button id="add-stop-btn" class="cat-btn" style="margin-bottom:0.5rem;">+ Add Stop</button>
+      <div style="margin-bottom:0.5rem;">
+        <input id="destination-input" class="mini-input" placeholder="Destination (lon,lat)" style="width:100%;"/>
+      </div>
+      <button id="calc-route-btn" class="cat-btn" style="background:var(--primary-accent);color:#000;">Calculate Route</button>
+      <div id="trip-info" style="margin-top:0.5rem;color:var(--text-dim);"></div>
+    </aside>
+  <main class="app-main">
+    <div id="map" class="map-container"></div>
+  </main>
+
+  <script src="https://unpkg.com/maplibre-gl@3.5.0/dist/maplibre-gl.js"></script>
+  <script src="mapEngine.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>

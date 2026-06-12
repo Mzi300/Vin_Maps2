@@ -1,0 +1,22 @@
+/* frontend/style/turnPanel.css */
+/* Premium glass‑morphism panel styling */
+#turn-panel {
+  /* already styled in JS, but add extra visual polish */
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.2s ease, opacity 0.2s ease;
+}
+#turn-panel:hover {
+  transform: translateY(-2px);
+  opacity: 0.98;
+}
+#turn-panel ol {
+  margin: 0;
+  padding-left: 20px;
+}
+#turn-panel li {
+  font-size: 0.9rem;
+  line-height: 1.3;
+}
