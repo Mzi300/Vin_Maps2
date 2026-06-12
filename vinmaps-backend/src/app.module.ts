@@ -58,6 +58,7 @@ import jwtConfig from './config/jwt.config';
     HealthModule,
     VerificationModule,
     NotificationsModule,
+    AppCacheModule,
     ObservabilityModule,
     AiModule,
   ],
