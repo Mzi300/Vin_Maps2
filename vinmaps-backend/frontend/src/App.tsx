@@ -1,20 +1,30 @@
-import { MapBranding } from './components/MapBranding';
+import React, { useEffect, useState } from 'react';
+import { useTrafficAlerts } from './hooks/useTrafficAlerts';
+import MapOverlay from './components/MapOverlay';
+import MapBranding from './components/MapBranding';
+import TrafficLegend from './components/TrafficLegend';
+import { TrafficAlertToast } from './components/TrafficAlertToast';
 
 function App() {
   const [showOverlay, setShowOverlay] = useState(true);
   const [highContrast, setHighContrast] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
 
   const { alerts } = useTrafficAlerts();
 
   const toggleContrast = () => setHighContrast(!highContrast);
+  const toggleDarkMode = () => setDarkMode(!darkMode);
+
+  // Apply dark or light theme to the root element
+  useEffect(() => {
+    document.documentElement.dataset.theme = darkMode ? 'dark' : 'light';
+  }, [darkMode]);
 
   return (
     <>
-      <section id="center">
+      <section id="center" className="glass">
         <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="VinMaps hero image" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+          {/* Placeholder for branding/logo images */}
         </div>
         <div>
           <h1>Real‑time Traffic Overlay</h1>
@@ -22,23 +32,38 @@ function App() {
         </div>
         <button
           type="button"
-          className="counter"
+          className="counter btn transition"
           onClick={() => setShowOverlay(!showOverlay)}
         >
           {showOverlay ? 'Hide' : 'Show'} Overlay
         </button>
         <button
           type="button"
-          className="counter"
+          className="counter btn transition"
           onClick={toggleContrast}
           aria-pressed={highContrast}
           aria-label="Toggle high‑contrast mode"
         >
           {highContrast ? 'Normal Contrast' : 'High Contrast'}
         </button>
+        <button
+          type="button"
+          className="counter btn transition"
+          onClick={toggleDarkMode}
+          aria-pressed={darkMode}
+          aria-label="Toggle dark mode"
+        >
+          {darkMode ? 'Light Mode' : 'Dark Mode'}
+        </button>
       </section>
 
-      <div role="region" aria-live="polite" aria-atomic="true" style={{ position: 'absolute', left: '-9999px' }}></div>
+      {/* Hidden live region for screen‑reader announcements */}
+      <div
+        role="region"
+        aria-live="polite"
+        aria-atomic="true"
+        style={{ position: 'absolute', left: '-9999px' }}
+      />
 
       <MapOverlay show={showOverlay} highContrast={highContrast} />
       <MapBranding />

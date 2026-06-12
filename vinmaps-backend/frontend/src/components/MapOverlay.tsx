@@ -95,5 +95,5 @@ export default MapOverlay;
     }
   }, [clusters, show, highContrast]);
 
-  return <div ref={mapRef} style={{ height: '100vh', width: '100%' }} aria-label="Live traffic map" role="region" />;
+  return <div ref={mapRef} className="glass" tabIndex={0} style={{ height: '100vh', width: '100%' }} aria-label="Live traffic map" role="region" />;
 };
