@@ -79,12 +79,7 @@ export class MapRenderer {
         (this.map as any).visualEffects = this.visualEffects;
         this.cameraController = new NavigationCameraController(this.map);
 
-        // Add Mapbox scale control for tactical navigation scale
-        const scale = new mapboxgl.ScaleControl({
-          maxWidth: 80,
-          unit: 'metric'
-        });
-        this.map.addControl(scale, 'bottom-left');
+        // Removed Mapbox scale control per user request
 
         // 3. Cinematic lighting preset
         let lightPreset = 'dusk';

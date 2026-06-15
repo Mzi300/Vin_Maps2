@@ -761,11 +761,14 @@ body {
 
 /* TACTICAL DROPDOWN */
 .dropdown-container {
-  position: relative;
+  position: fixed;
+  bottom: 20px;
+  left: 20px;
   display: flex;
   width: fit-content;
   pointer-events: auto;
   padding: 5px;
+  z-index: 2000;
 }
 
 .dropdown-menu {
