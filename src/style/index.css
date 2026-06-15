@@ -772,10 +772,10 @@ body {
   position: absolute;
   bottom: 100%;
   left: 0;
-  width: 280px;
-  max-height: 450px; /* Slightly taller */
+  width: 250px;
+  max-height: calc(100vh - 120px);
   overflow-y: auto;
-  margin-bottom: 15px;
+  margin-bottom: 10px;
   display: none;
   flex-direction: column;
   padding: 1rem;
@@ -790,8 +790,14 @@ body {
 .dropdown-section {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding: 5px 0;
+  gap: 3px;
+  padding: 2px 0;
+}
+
+.dropdown-section .cat-btn {
+  padding: 0.35rem 0.8rem;
+  font-size: 0.75rem;
+  border-radius: 12px;
 }
 
 .dropdown-section label {
@@ -806,7 +812,7 @@ body {
 .dropdown-divider {
   height: 1px;
   background: var(--glass-border);
-  margin: 10px 0;
+  margin: 6px 0;
 }
 
 .dropdown-toggle {
