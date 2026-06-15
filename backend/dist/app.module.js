@@ -27,13 +27,21 @@ exports.AppModule = AppModule = __decorate([
     (0, common_1.Module)({
         imports: [
             config_1.ConfigModule.forRoot(),
-            typeorm_1.TypeOrmModule.forRoot({
-                type: 'postgres',
-                url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/vinmaps',
-                entities: [hazard_entity_1.Hazard, driver_session_entity_1.DriverSession, traffic_light_entity_1.TrafficLight],
-                synchronize: true,
-                logging: true,
-            }),
+            typeorm_1.TypeOrmModule.forRoot(process.env.USE_SQLITE === 'true'
+                ? {
+                    type: 'sqlite',
+                    database: process.env.SQLITE_DB_PATH || 'vinmaps.sqlite',
+                    entities: [hazard_entity_1.Hazard, driver_session_entity_1.DriverSession, traffic_light_entity_1.TrafficLight],
+                    synchronize: true,
+                    logging: true,
+                }
+                : {
+                    type: 'postgres',
+                    url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/vinmaps',
+                    entities: [hazard_entity_1.Hazard, driver_session_entity_1.DriverSession, traffic_light_entity_1.TrafficLight],
+                    synchronize: true,
+                    logging: true,
+                }),
             hazards_module_1.HazardsModule,
             intelligence_module_1.IntelligenceModule,
             emergency_module_1.EmergencyModule,

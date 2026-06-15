@@ -15,13 +15,25 @@ import { TrafficLight } from './smart-city/traffic-light.entity';
 @Module({
   imports: [
     ConfigModule.forRoot(),
-    TypeOrmModule.forRoot({
-      type: 'postgres',
-      url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/vinmaps',
-      entities: [Hazard, DriverSession, TrafficLight],
-      synchronize: true, // Auto-create tables (use migrations for production)
-      logging: true,
-    }),
+    // Allow using a lightweight SQLite fallback when POSTGRES is not available.
+    // Set USE_SQLITE=true to enable (useful for local dev without Docker/Postgres).
+    TypeOrmModule.forRoot(
+      process.env.USE_SQLITE === 'true'
+        ? {
+            type: 'sqlite',
+            database: process.env.SQLITE_DB_PATH || 'vinmaps.sqlite',
+            entities: [Hazard, DriverSession, TrafficLight],
+            synchronize: true,
+            logging: true,
+          }
+        : {
+            type: 'postgres',
+            url: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/vinmaps',
+            entities: [Hazard, DriverSession, TrafficLight],
+            synchronize: true, // Auto-create tables (use migrations for production)
+            logging: true,
+          }
+    ),
     HazardsModule,
     IntelligenceModule,
     EmergencyModule,
