@@ -372,9 +372,15 @@ export class MapRenderer {
   // Preserve backward compatibility for any older code using the old name
   public onStyleLoaded(cb: () => void) { this.onStyleReady(cb); }
 
-public enterNavigationMode() {
+public enterCinematicMode() {
     if (this.cameraController) {
       this.cameraController.setMode(CameraMode.CINEMATIC);
+    }
+  }
+
+  public enterNavigationMode() {
+    if (this.cameraController) {
+      this.cameraController.setMode(CameraMode.NAVIGATION);
     }
   }
 
@@ -402,8 +408,6 @@ public enterNavigationMode() {
     _maxZoom: number = 19
   ) {
     if (this.cameraController) {
-      // Force follow mode if this is a mandatory update (e.g. start of nav)
-      if (force) this.cameraController.setMode(CameraMode.CINEMATIC);
       this.cameraController.update(coords, heading, speed, force);
     }
   }

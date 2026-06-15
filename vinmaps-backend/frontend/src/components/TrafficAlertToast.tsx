@@ -1,5 +1,5 @@
 import React from 'react';
-import { TrafficAlert } from '../hooks/useTrafficAlerts';
+import type { TrafficAlert } from '../hooks/useTrafficAlerts';
 
 interface Props {
   alerts: TrafficAlert[];

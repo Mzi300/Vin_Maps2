@@ -64,6 +64,10 @@ export class NavigationSystem {
     isMoving: false
   };
 
+  private gpsTraceBuffer: [number, number][] = [];
+  private lastMapMatchTime: number = 0;
+  private readonly MAPBOX_TOKEN = import.meta.env?.VITE_MAPBOX_TOKEN || 'pk.eyJ1IjoibXppa2F5aXNlMDEiLCJhIjoiY21vczd4ajc4MDA5ODJ3c2R3NDV2dHI0NSJ9.gbvq-aQiEttYKka8u4qmqg';
+
   private hasDetectedMotion: boolean = false;
   private headingBuffer: number[] = [];
   private readonly HEADING_BUFFER_SIZE = 15;
@@ -100,6 +104,12 @@ export class NavigationSystem {
     this.generatePreMissionBriefing(route);
     
     this.startTracking();
+  }
+
+  public silentRestart(route: OptimizedRoute) {
+    this.route = route;
+    this.currentStepIndex = 0;
+    this.speak("Recalculating route.");
   }
 
   private generatePreMissionBriefing(route: OptimizedRoute) {
@@ -344,6 +354,19 @@ export class NavigationSystem {
       this.currentState.compassDirection = this.calculateCompassDirection(clampedHeading);
     }
 
+    // MAP MATCHING API INTEGRATION (Step 3)
+    // Keep the last 25 GPS coordinates to send a solid trace for Map-Matching
+    this.gpsTraceBuffer.push(smoothedPos);
+    if (this.gpsTraceBuffer.length > 25) {
+      this.gpsTraceBuffer.shift();
+    }
+
+    // Call Map Matching API every 5 seconds if we have at least 3 points
+    if (now - this.lastMapMatchTime > 5000 && this.gpsTraceBuffer.length >= 3) {
+      this.lastMapMatchTime = now;
+      this.fetchMapMatching();
+    }
+
     // 8. Maneuver & Step Tracking
     if (this.route) this.trackManeuvers(smoothedPos);
 
@@ -445,10 +468,22 @@ export class NavigationSystem {
     const distanceToNext = this.calculateDistanceToNextStep(pos);
     const nextStep = this.route.steps[this.currentStepIndex];
 
-    // Trigger instruction if approaching (e.g., 200m before turn)
-    if (distanceToNext < 200 && !nextStep.announced) {
-      this.speak(`In ${Math.round(distanceToNext)} meters, ${nextStep.maneuver.instruction}`);
-      nextStep.announced = true;
+    // Professional maneuver timing sequence
+    if (distanceToNext < 2000 && !nextStep.announced2km) {
+      nextStep.announced2km = true;
+      if (distanceToNext > 1500) {
+        this.speak(`In ${Math.round(distanceToNext/1000)} kilometers, ${nextStep.maneuver.instruction}`);
+      }
+    }
+    if (distanceToNext < 500 && !nextStep.announced500m) {
+      nextStep.announced500m = true;
+      if (distanceToNext > 150) {
+        this.speak(`In ${Math.round(distanceToNext/10)*10} meters, ${nextStep.maneuver.instruction}`);
+      }
+    }
+    if (distanceToNext < 60 && !nextStep.announced50m) {
+      nextStep.announced50m = true;
+      this.speak(`${nextStep.maneuver.instruction}`);
     }
 
     // Step completion detection
@@ -563,24 +598,72 @@ export class NavigationSystem {
     
     this.isSpeaking = true;
     const text = this.voiceQueue.shift()!;
-    const utterance = new SpeechSynthesisUtterance(text);
+    const url = `https://api.mapbox.com/voice/v1/speaker?text=${encodeURIComponent(text)}&instructionFormat=text&language=en-US&access_token=${this.MAPBOX_TOKEN}`;
     
-    utterance.onend = () => {
+    const audio = new Audio(url);
+    
+    audio.onended = () => {
       this.isSpeaking = false;
       this.processVoiceQueue();
     };
     
-    utterance.onerror = () => {
-      this.isSpeaking = false;
-      this.processVoiceQueue();
+    audio.onerror = () => {
+      console.warn('[NavigationSystem] Mapbox Voice API failed, falling back to browser TTS');
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => {
+        this.isSpeaking = false;
+        this.processVoiceQueue();
+      };
+      utterance.onerror = () => {
+        this.isSpeaking = false;
+        this.processVoiceQueue();
+      };
+      window.speechSynthesis.speak(utterance);
     };
 
-    window.speechSynthesis.speak(utterance);
+    audio.play().catch((e) => {
+      // Handle auto-play restrictions
+      audio.onerror(e as any);
+    });
   }
 
   private calculateCompassDirection(bearing: number): string {
     const directions = ['North', 'North-East', 'East', 'South-East', 'South', 'South-West', 'West', 'North-West'];
     const index = Math.round(((bearing %= 360) < 0 ? bearing + 360 : bearing) / 45) % 8;
     return directions[index];
+  }
+
+  private async fetchMapMatching() {
+    try {
+      const coords = this.gpsTraceBuffer.map(c => `${c[0]},${c[1]}`).join(';');
+      // Using radiuses=25 to allow some GPS jitter tolerance
+      const radiuses = this.gpsTraceBuffer.map(() => 25).join(';');
+      const url = `https://api.mapbox.com/matching/v5/mapbox/driving/${coords}?geometries=geojson&radiuses=${radiuses}&access_token=${this.MAPBOX_TOKEN}`;
+      
+      const res = await fetch(url);
+      const data = await res.json();
+      
+      if (data.code === 'Ok' && data.matchings && data.matchings.length > 0) {
+        const match = data.matchings[0];
+        // The last coordinate of the matched geometry is our perfectly snapped current position
+        const snappedCoords = match.geometry.coordinates[match.geometry.coordinates.length - 1];
+        
+        // Update current position strictly to the road network
+        this.currentState.currentPosition = snappedCoords as [number, number];
+        
+        // Also update heading based on the exact road segment
+        if (match.geometry.coordinates.length >= 2) {
+            const p1 = match.geometry.coordinates[match.geometry.coordinates.length - 2];
+            const p2 = snappedCoords;
+            const roadHeading = (Math.atan2(p2[0] - p1[0], p2[1] - p1[1]) * 180) / Math.PI;
+            this.currentState.heading = roadHeading;
+            this.currentState.compassDirection = this.calculateCompassDirection(roadHeading);
+        }
+
+        if (this.onUpdate) this.onUpdate(this.currentState);
+      }
+    } catch (e) {
+      console.error('[MapMatching] Failed to perfectly snap to road:', e);
+    }
   }
 }

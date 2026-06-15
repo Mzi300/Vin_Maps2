@@ -396,9 +396,15 @@ export class NavigationCameraController {
           this.cinematicPitchTarget = 55;
           this.cinematicZoomTarget = 18.0;
         }
+
+        // GTA 5 Hard-Cut Effect: Instantaneously snap the camera to the new angle
+        this.current.bearing = this.currentVehicleBearing + this.cinematicAngleOffset;
+        this.current.pitch = this.cinematicPitchTarget;
+        this.current.zoom = this.cinematicZoomTarget;
       }
 
-      this.cinematicAngleOffset += (Math.random() > 0.5 ? 0.05 : -0.05) * dt;
+      // Very slow cinematic drift while holding the shot
+      this.cinematicAngleOffset += (Math.random() > 0.5 ? 0.02 : -0.02) * dt;
 
       targetBearing = this.currentVehicleBearing + this.cinematicAngleOffset;
       targetPitch = this.cinematicPitchTarget;

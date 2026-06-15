@@ -33,7 +33,12 @@ const levelToStyle = (level: string, highContrast: boolean) => {
   }
 };
 
-export default MapOverlay;
+interface MapOverlayProps {
+  show: boolean;
+  highContrast: boolean;
+}
+
+const MapOverlay: React.FC<MapOverlayProps> = ({ show, highContrast }) => {
   const mapRef = useRef<HTMLDivElement>(null);
   const { clusters } = useTraffic();
   const leafletMapRef = useRef<L.Map | null>(null);
@@ -54,7 +59,6 @@ export default MapOverlay;
         maxZoom: 19,
         attribution: '&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a> contributors',
         detectRetina: true,
-        reuseTiles: true,
       }).addTo(map);
       leafletMapRef.current = map;
     }
@@ -65,8 +69,8 @@ export default MapOverlay;
     if (!leafletMapRef.current) return;
     const map = leafletMapRef.current;
     // Clear previous circles (only those in trafficOverlay pane)
-    map.eachLayer((layer) => {
-      if ((layer as any).options && (layer as any).options.pane === 'trafficOverlay') {
+    map.eachLayer((layer: any) => {
+      if (layer.options && layer.options.pane === 'trafficOverlay') {
         map.removeLayer(layer);
       }
     });
@@ -83,8 +87,6 @@ export default MapOverlay;
           radius: style.radius * 100, // metres for visibility
           fillOpacity: style.fillOpacity,
           pane: 'trafficOverlay',
-          // ARIA‑friendly title for screen readers
-          title: `Traffic ${c.trafficLevel}, ${c.vehicleCount} vehicles, avg ${c.averageSpeed.toFixed(1)} km/h`,
         });
         circle.bindTooltip(
           `<b>Level:</b> ${c.trafficLevel}<br/><b>Vehicles:</b> ${c.vehicleCount}<br/><b>Avg Speed:</b> ${c.averageSpeed.toFixed(1)} km/h`,
@@ -97,3 +99,5 @@ export default MapOverlay;
 
   return <div ref={mapRef} className="glass" tabIndex={0} style={{ height: '100vh', width: '100%' }} aria-label="Live traffic map" role="region" />;
 };
+
+export default MapOverlay;

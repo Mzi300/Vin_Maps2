@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">VinMaps</string>
+    <string name="title_activity_main">VinMaps</string>
+    <string name="package_name">com.vinmaps.tactical</string>
+    <string name="custom_url_scheme">com.vinmaps.tactical</string>
+</resources>

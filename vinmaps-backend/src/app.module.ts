@@ -1,4 +1,5 @@
-
+import { Module } from '@nestjs/common';
+import { ObservabilityModule } from './observability/observability.module';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { APP_GUARD, NestModule, MiddlewareConsumer } from '@nestjs/core';
 import { TypeOrmModule } from '@nestjs/typeorm';

@@ -44,8 +44,23 @@ class App {
     this.initViewportHeight();
     this.initResizeObserver();
     this.unlockVoiceSynthesis();
+    this.registerOfflineServiceWorker();
     // Defer heavy systems to achieve <1s UI visibility
     setTimeout(() => this.initHeavySystems(), 10);
+  }
+
+  private registerOfflineServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/offlineSW.js')
+          .then(registration => {
+            console.log('[Offline] ServiceWorker registered perfectly:', registration.scope);
+          })
+          .catch(error => {
+            console.error('[Offline] ServiceWorker registration failed:', error);
+          });
+      });
+    }
   }
 
   private unlockVoiceSynthesis() {
@@ -490,7 +505,7 @@ class App {
     this.navSystem.snapToPosition(this.currentOriginCoords || initialCoords, 0);
     this.navSystem.startTracking();
     if (this.map) {
-      this.map.enterNavigationMode(); // This enables camera follow mode
+      this.map.enterCinematicMode(); // Cinematic panning on startup
     }
 
     // REVEAL UI
@@ -1044,9 +1059,34 @@ class App {
     if (hazardFab) hazardFab.style.display = 'flex';
     
     this.navSystem.onOffRoute = () => {
-      this.speakBriefing("Recalculating route.");
-      this.finalizeRouting(this.currentTransportType);
+      this.silentReroute(this.currentTransportType);
     };
+  }
+
+  private async silentReroute(type: TransportType) {
+    const currentPos = this.navSystem.getCurrentPosition();
+    if (!currentPos || !this.currentDestCoords) return;
+
+    if (this.routingAbortController) this.routingAbortController.abort();
+    this.routingAbortController = new AbortController();
+
+    const profile = TRANSPORT_PROFILES[type].mapboxProfile;
+    
+    try {
+      const route = await this.routeOptimizer.fetchAndOptimizeRoute(
+        currentPos,
+        this.currentDestCoords,
+        profile,
+        this.routingAbortController.signal
+      );
+
+      if (route) {
+        this.map.updateRoute(route);
+        this.navSystem.silentRestart(route);
+      }
+    } catch (e) {
+      if ((e as Error).name !== 'AbortError') console.error('Silent reroute fail:', e);
+    }
   }
 
     private async filterUrbanIntelligence(category: string) {
