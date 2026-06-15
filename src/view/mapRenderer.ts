@@ -280,13 +280,12 @@ export class MapRenderer {
    *  Camera flight helpers
    *  -------------------------------------------------------------- */
   public flyTo(lng: number, lat: number, zoom: number = 18.5) {
-    // Locked
     this.map.flyTo({
       center: [lng, lat],
       zoom: zoom,
-      pitch: 68, 
-      speed: 1.0, 
-      curve: 1.0,
+      pitch: 65, 
+      speed: 0.8, 
+      curve: 1.5, // High parabolic sweep for cinematic effect
       essential: true
     });
   }
